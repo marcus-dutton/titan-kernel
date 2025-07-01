@@ -2,9 +2,7 @@
   "environment": "development",
   "port": 3000,
   "logging": {
-    "level": "debug",
-    "enableConsole": true,
-    "enableDatabase": false
+    "databaseAccess": false
   },
   "database": {
     "url": "mongodb+srv://username:password@cluster.mongodb.net/titankernel?retryWrites=true&w=majority",

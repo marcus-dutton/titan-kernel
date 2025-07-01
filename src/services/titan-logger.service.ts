@@ -19,55 +19,95 @@ export interface LogEntry {
 }
 
 export interface LoggerConfig {
-  enableDatabase?: boolean;
-  enableConsole?: boolean;
-  enableSocket?: boolean;
-  maxBufferSize?: number;
-  logLevel?: LogLevel;
+  databaseAccess?: boolean;
 }
 
 @Injectable()
 export class TitanLoggerService {
-  private logLevel: LogLevel = LogLevel.NONE;  // Default to NONE (no debug output)
+  private logLevel: LogLevel = LogLevel.NONE;  // Default to NONE (silent)
   private socketServer?: SocketIOServer;
   private originalConsole: any = {};
   private logBuffer: LogEntry[] = [];
-  private maxBufferSize: number = 10000;  // Increased from 1000 to 10000 for better development experience
+  private consoleBuffer: string[] = [];  // Unlimited console buffer for large files
   private consoleEnabled: boolean = true;
-  private databaseEnabled: boolean = false;
+  private databaseAccess: boolean = false;  // Read from config
   private socketEnabled: boolean = true;
   private dbReady: boolean = false;
+  private consoleCapturingStarted: boolean = false;
+  private offlineQueue: LogEntry[] = [];
+  private operationQueue: (() => Promise<void>)[] = [];
 
   constructor() {
+    this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
+    // Read config to get databaseAccess setting
+    await this.loadConfigFromFile();
+    
     this.captureConsole();
+    this.setupDatabaseConnectionWatcher();
   }
 
-  configure(config: LoggerConfig): void {
-    this.databaseEnabled = config.enableDatabase ?? false;
-    this.consoleEnabled = config.enableConsole ?? true;
-    this.socketEnabled = config.enableSocket ?? true;
-    this.maxBufferSize = config.maxBufferSize ?? 10000;  // Updated default from 1000 to 10000
-    
-    // Set log level if provided, otherwise keep current (defaults to NONE)
-    if (config.logLevel !== undefined) {
-      this.logLevel = config.logLevel;
+  private async loadConfigFromFile(): Promise<void> {
+    try {
+      // Try to read titan.config.json from project root
+      const fs = await import('fs');
+      const path = await import('path');
+      const configPath = path.join(process.cwd(), 'titan.config.json');
+      
+      if (fs.existsSync(configPath)) {
+        const configContent = fs.readFileSync(configPath, 'utf-8');
+        const config = JSON.parse(configContent);
+        
+        // Read the databaseAccess setting
+        this.databaseAccess = config.logging?.databaseAccess ?? false;
+        
+        // If database access is enabled, auto-upgrade log level at runtime when DB is ready
+        if (this.databaseAccess && this.dbReady) {
+          this.logLevel = LogLevel.INFO;
+        }
+      }
+    } catch (error) {
+      // Config file not found or invalid, use defaults
+      console.warn('Could not load titan.config.json, using default logging settings');
     }
-    
-    if (!this.consoleEnabled) {
-      this.restoreConsole();
+  }
+
+  private setupDatabaseConnectionWatcher(): void {
+    // Check for database availability periodically
+    const checkConnection = () => {
+      // This would be connected to actual database connection
+      // For now, assume database is ready if databaseAccess is enabled
+      const wasReady = this.dbReady;
+      this.dbReady = this.databaseAccess; // Simplified for now
+      
+      if (this.dbReady && !wasReady) {
+        // Database just became ready - auto-upgrade log level if databaseAccess is true
+        if (this.databaseAccess && this.logLevel === LogLevel.NONE) {
+          this.logLevel = LogLevel.INFO;
+          this.info('🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' }, 'TitanLogger');
+        }
+        this.flushQueuedOperations();
+      }
+    };
+
+    checkConnection();
+    setInterval(checkConnection, 30000); // Check every 30 seconds
+  }
+
+  private async queueDatabaseOperation(operation: () => Promise<void>): Promise<void> {
+    if (this.dbReady && this.databaseAccess) {
+      await operation();
     } else {
-      this.captureConsole();
+      this.operationQueue.push(operation);
     }
   }
 
-  setDatabaseReady(ready: boolean): void {
-    this.dbReady = ready;
-    
-    // Auto-configure log level based on database availability
-    // If database is ready and we're still at NONE, upgrade to INFO for better visibility
-    if (ready && this.logLevel === LogLevel.NONE && this.databaseEnabled) {
-      this.logLevel = LogLevel.INFO;
-      this.info('🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' }, 'TitanLogger');
+  private async flushQueuedOperations(): Promise<void> {
+    while (this.operationQueue.length > 0) {
+      const operation = this.operationQueue.shift();
+      if (operation) await operation();
     }
   }
 
@@ -152,15 +192,49 @@ export class TitanLoggerService {
       this.socketOutput(entry);
     }
 
-    if (this.databaseEnabled && this.dbReady) {
+    // Database persistence when enabled and ready
+    if (this.databaseAccess && this.dbReady) {
       this.databaseOutput(entry);
+    } else if (this.databaseAccess) {
+      // Queue for later if database not ready
+      this.offlineQueue.push(entry);
     }
   }
 
   private addToBuffer(entry: LogEntry): void {
     this.logBuffer.push(entry);
-    if (this.logBuffer.length > this.maxBufferSize) {
-      this.logBuffer.shift();
+    // No size limit - keep everything for large file support (10MB+)
+    // Removed: if (this.logBuffer.length > this.maxBufferSize) this.logBuffer.shift();
+  }
+
+  // Add console buffer methods like your original
+  public addToConsoleBuffer(message: string): void {
+    this.consoleBuffer.push(message);
+    // No size restrictions - handle large data
+    this.broadcastConsoleOutput(message);
+  }
+
+  public transferBuffer(earlyBuffer: string[]): void {
+    console.log(`Transferring ${earlyBuffer.length} early console messages`);
+    
+    // Add early messages to the beginning - NO SIZE LIMIT!
+    this.consoleBuffer = [...earlyBuffer, ...this.consoleBuffer];
+    
+    console.log(`Buffer now contains ${this.consoleBuffer.length} total messages`);
+    
+    // Broadcast transferred logs if socket ready
+    if (this.socketServer) {
+      const response = {
+        success: true,
+        data: {
+          type: 'console_history',
+          buffer: this.consoleBuffer,
+          timestamp: new Date().toISOString()
+        },
+        message: 'Early console logs transferred and broadcasted'
+      };
+      
+      this.socketServer.emit('console_output', response);
     }
   }
 
@@ -228,40 +302,12 @@ export class TitanLoggerService {
   private captureConsole(): void {
     if (!this.consoleEnabled) return;
 
-    // Only capture if we haven't already
-    if (Object.keys(this.originalConsole).length > 0) return;
-
-    // Store original console methods with proper binding
-    this.originalConsole = {
-      log: console.log.bind(console),
-      warn: console.warn.bind(console),
-      error: console.error.bind(console),
-      info: console.info.bind(console)
-    };
-
-    // Override console methods to capture for frontend
-    console.log = (...args) => {
-      // Send to buffer and socket (for frontend) but don't output to console to avoid recursion
-      this.log(LogLevel.INFO, args.join(' '), undefined, 'console');
-    };
-
-    console.warn = (...args) => {
-      this.log(LogLevel.WARN, args.join(' '), undefined, 'console');
-    };
-
-    console.error = (...args) => {
-      this.log(LogLevel.ERROR, args.join(' '), undefined, 'console');
-    };
-
-    console.info = (...args) => {
-      this.log(LogLevel.INFO, args.join(' '), undefined, 'console');
-    };
+    // Use the new console capture method
+    this.startConsoleCapture();
   }
 
   restoreConsole(): void {
-    if (Object.keys(this.originalConsole).length > 0) {
-      Object.assign(console, this.originalConsole);
-    }
+    this.stopConsoleCapture();
   }
 
   getLogBuffer(): LogEntry[] {
@@ -270,5 +316,198 @@ export class TitanLoggerService {
 
   clearBuffer(): void {
     this.logBuffer = [];
+  }
+
+  // Console capture methods matching your original design
+  private broadcastConsoleOutput(message: string): void {
+    if (!this.socketServer) {
+      return; // Socket not available yet
+    }
+
+    try {
+      const response = {
+        success: true,
+        data: {
+          type: 'console_output',
+          message: message,
+          timestamp: new Date().toISOString(),
+          buffer: this.consoleBuffer // Send full buffer
+        },
+        message: 'Console output broadcasted'
+      };
+
+      this.socketServer.emit('console_output', response);
+    } catch (err) {
+      // Use original console to avoid infinite recursion
+      if (this.originalConsole.error) {
+        this.originalConsole.error('[TitanLogger] Failed to broadcast console output:', err);
+      }
+    }
+  }
+
+  private formatConsoleArgs(level: string, args: any[]): string {
+    const timestamp = new Date().toLocaleString();
+    const levelColors: Record<string, string> = {
+      log: '\x1b[0m',    // No color for log
+      info: '\x1b[94m',  // Bright blue
+      warn: '\x1b[33m',  // Yellow
+      error: '\x1b[31m', // Red
+      debug: '\x1b[95m', // Magenta
+    };
+
+    const color = levelColors[level] || '\x1b[0m';
+    const resetColor = '\x1b[0m';
+
+    // Format arguments to strings, preserving objects and complex types
+    const formattedArgs = args.map(arg => {
+      if (typeof arg === 'string') {
+        return arg;
+      } else if (typeof arg === 'object' && arg !== null) {
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch (err) {
+          return String(arg);
+        }
+      } else {
+        return String(arg);
+      }
+    }).join(' ');
+
+    // Return formatted string with ANSI colors preserved
+    return `${color}[${timestamp}] [${level.toUpperCase()}]: ${formattedArgs}${resetColor}`;
+  }
+
+  // Method to start console capturing (matching your original)
+  startConsoleCapture(): void {
+    if (this.consoleCapturingStarted) {
+      return;
+    }
+
+    // Store original console methods
+    this.originalConsole = {
+      log: console.log.bind(console),
+      info: console.info.bind(console),
+      warn: console.warn.bind(console),
+      error: console.error.bind(console),
+      debug: console.debug.bind(console),
+    };
+
+    // Add startup message to buffer
+    this.addToConsoleBuffer(`[${new Date().toISOString()}] Console capture started - TitanKernel logging initialized`);
+
+    // Override console methods with formatting like your original
+    console.log = (...args: any[]) => {
+      const formatted = this.formatConsoleArgs('log', args);
+      this.addToConsoleBuffer(formatted);
+      this.originalConsole.log(...args);
+    };
+
+    console.info = (...args: any[]) => {
+      const formatted = this.formatConsoleArgs('info', args);
+      this.addToConsoleBuffer(formatted);
+      this.originalConsole.info(...args);
+    };
+
+    console.warn = (...args: any[]) => {
+      const formatted = this.formatConsoleArgs('warn', args);
+      this.addToConsoleBuffer(formatted);
+      this.originalConsole.warn(...args);
+    };
+
+    console.error = (...args: any[]) => {
+      const formatted = this.formatConsoleArgs('error', args);
+      this.addToConsoleBuffer(formatted);
+      this.originalConsole.error(...args);
+    };
+
+    console.debug = (...args: any[]) => {
+      const formatted = this.formatConsoleArgs('debug', args);
+      this.addToConsoleBuffer(formatted);
+      this.originalConsole.debug(...args);
+    };
+
+    this.consoleCapturingStarted = true;
+  }
+
+  // Method to stop console capturing and restore original methods
+  stopConsoleCapture(): void {
+    if (!this.consoleCapturingStarted) {
+      return;
+    }
+
+    // Restore original console methods
+    console.log = this.originalConsole.log as any;
+    console.info = this.originalConsole.info as any;
+    console.warn = this.originalConsole.warn as any;
+    console.error = this.originalConsole.error as any;
+    console.debug = this.originalConsole.debug as any;
+
+    this.consoleCapturingStarted = false;
+  }
+
+  // Method to get current console buffer
+  getConsoleBuffer(): string[] {
+    return [...this.consoleBuffer]; // Return a copy
+  }
+
+  // Method to clear console buffer
+  clearConsoleBuffer(): void {
+    this.consoleBuffer = [];
+    
+    // Broadcast buffer clear event
+    if (this.socketServer) {
+      const response = {
+        success: true,
+        data: {
+          type: 'console_cleared',
+          timestamp: new Date().toISOString()
+        },
+        message: 'Console buffer cleared'
+      };
+
+      this.socketServer.emit('console_clear', response);
+    }
+  }
+
+  // Methods expected by the kernel
+  configure(config: any): void {
+    // Handle legacy properties and map them to your simple design
+    if (config.enableDatabase !== undefined) {
+      this.databaseAccess = config.enableDatabase;
+    }
+    if (config.databaseAccess !== undefined) {
+      this.databaseAccess = config.databaseAccess;
+    }
+    
+    // Handle console settings (always enabled by default in your design)
+    if (config.enableConsole !== undefined) {
+      this.consoleEnabled = config.enableConsole;
+    }
+    
+    // Handle socket settings (always enabled by default in your design)  
+    if (config.enableSocket !== undefined) {
+      this.socketEnabled = config.enableSocket;
+    }
+    
+    // If database access is enabled and DB is ready, auto-upgrade log level
+    if (this.databaseAccess && this.dbReady && this.logLevel === LogLevel.NONE) {
+      this.logLevel = LogLevel.INFO;
+      this.info('🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' }, 'TitanLogger');
+    }
+  }
+
+  setDatabaseReady(ready: boolean): void {
+    this.dbReady = ready;
+    
+    // Auto-configure log level based on database availability
+    // If database is ready and we have database access enabled, upgrade to INFO for better visibility
+    if (ready && this.logLevel === LogLevel.NONE && this.databaseAccess) {
+      this.logLevel = LogLevel.INFO;
+      this.info('🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' }, 'TitanLogger');
+    }
+    
+    if (ready) {
+      this.flushQueuedOperations();
+    }
   }
 }

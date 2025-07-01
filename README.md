@@ -65,14 +65,11 @@ export class UserGateway {
 async function bootstrap() {
   const context = await TitanKernel.create({
     autoScan: true,
-    logLevel: 'debug',
     database: {
       url: 'mongodb+srv://username:password@cluster.mongodb.net/myapp?retryWrites=true&w=majority'
     },
-    logger: {
-      enableDatabase: true,  // Enable database persistence
-      enableConsole: true,
-      enableSocket: true
+    logging: {
+      databaseAccess: true  // Enable database persistence
     }
   });
 
@@ -178,9 +175,7 @@ Create `titan.config.json` in **your project's root directory** (not in the npm 
   "environment": "development",
   "port": 3000,
   "logging": {
-    "level": "debug",
-    "enableConsole": true,
-    "enableDatabase": false
+    "databaseAccess": false
   },
   "database": {
     "url": "mongodb+srv://username:password@cluster.mongodb.net/myapp?retryWrites=true&w=majority",
@@ -239,7 +234,7 @@ export class DatabaseService {
 
 ### Logging
 
-Built-in enhanced logger with multiple outputs, **automatic console capture**, and **optional database persistence**:
+Built-in enhanced logger with **automatic console capture**, **unlimited buffer for large files**, and **optional database persistence**:
 
 ```typescript
 @Injectable()
@@ -258,29 +253,36 @@ export class MyService {
 }
 ```
 
-**Logger Configuration:**
-```typescript
-const context = await TitanKernel.create({
-  logger: {
-    enableDatabase: true,    // Enable database persistence (default: false)
-    enableConsole: true,     // Enable console output (default: true)
-    enableSocket: true,      // Enable Socket.IO output (default: true)
-    maxBufferSize: 20000     // Log buffer size (default: 10000)
+**Simplified Configuration:**
+TitanKernel uses a simple configuration approach - just set `databaseAccess` in your config file:
+
+```json
+{
+  "logging": {
+    "databaseAccess": false
   }
-});
+}
 ```
 
-**Console Capture Feature:**
+**Runtime Behavior:**
+- **Log Level**: Defaults to `NONE` (silent)
+- **Console Capture**: Always enabled (can be toggled at runtime)
+- **Socket.IO**: Always enabled for real-time frontend updates
+- **Database Access**: Controlled by config file
+- **Auto-Upgrade**: When `databaseAccess: true` and database is ready, log level automatically upgrades to `INFO`
+
+**Console Capture & Large File Support:**
 - All `console.log()`, `console.warn()`, `console.error()`, `console.info()` calls are automatically captured
+- **Unlimited buffer size** - handles large data streams (10MB+ files, Puppeteer blobs, etc.)
 - Captured console output is sent to frontend via Socket.IO for real-time debugging
 - TitanKernel's own logging still appears in console while user console calls are captured
 - No infinite recursion - smart filtering prevents logging loops
 
 **Database Persistence:**
-- **Off by default** - set `enableDatabase: true` to persist logs to MongoDB
+- **Off by default** - set `"databaseAccess": true` to persist logs to MongoDB
 - Logs are stored in `titan_logs` collection with timestamps, levels, and metadata
 - Graceful fallback - if database is unavailable, logging continues without persistence
-- Automatic reconnection handling
+- Automatic reconnection handling and offline queue for when database is not ready
 
 ### Advanced Bootstrap
 
@@ -292,7 +294,6 @@ const context = await TitanKernel.create({
     exclude: ['**/*.test.ts'],
     baseDir: process.cwd()
   },
-  logLevel: 'info',
   database: {
     url: 'mongodb+srv://username:password@cluster.mongodb.net/myapp?retryWrites=true&w=majority',
     name: 'myapp',
@@ -302,11 +303,8 @@ const context = await TitanKernel.create({
       socketTimeoutMS: 45000
     }
   },
-  logger: {
-    enableDatabase: true,
-    enableConsole: true,
-    enableSocket: true,
-    maxBufferSize: 20000    // Higher buffer for active development
+  logging: {
+    databaseAccess: true    // Enable database persistence
   }
 });
 
@@ -459,9 +457,7 @@ Create your corresponding `titan.config.json`:
   "environment": "development",
   "port": 3000,
   "logging": {
-    "level": "debug",
-    "enableConsole": true,
-    "enableDatabase": false
+    "databaseAccess": false
   },
   "database": {
     "url": "mongodb+srv://...",

@@ -10,10 +10,8 @@ export interface BootstrapOptions {
   autoScan?: boolean;
   scanOptions?: ScanOptions;
   configPath?: string;
-  logLevel?: string;
-  enableConsoleLogging?: boolean;
   database?: DatabaseConfig;
-  logger?: LoggerConfig;
+  logging?: LoggerConfig;
 }
 
 export class TitanKernel {
@@ -31,26 +29,20 @@ export class TitanKernel {
     const {
       autoScan = true,
       scanOptions = {},
-      logLevel,
-      enableConsoleLogging = true,
       database,
-      logger: loggerConfig
+      logging: loggerConfig
     } = options;
 
-    // Configure logger early
+    // Configure logger early - simplified configuration
     if (loggerConfig) {
       this.logger.configure(loggerConfig);
     } else {
       this.logger.configure({
-        enableConsole: enableConsoleLogging,
-        enableDatabase: false, // Default to false unless explicitly enabled
-        enableSocket: true
+        databaseAccess: false // Default to false unless explicitly enabled
       });
     }
     
-    // Set log level from options or config
-    const configuredLogLevel = logLevel || this.config.get('logging.level', 'info');
-    this.logger.setLogLevel(this.parseLogLevel(configuredLogLevel));
+    // Log level is now managed internally by TitanLogger based on config and database readiness
 
     this.logger.logToConsole(LogLevel.INFO, 'TitanKernel bootstrap started', undefined, 'TitanKernel');
 
@@ -137,16 +129,6 @@ export class TitanKernel {
       this.logger.logToConsole(LogLevel.ERROR, 'Database connection failed', { error: error.message }, 'TitanKernel');
       // Don't throw - allow kernel to continue without database
     }
-  }
-
-  private parseLogLevel(level: string): LogLevel {
-    const levels: Record<string, LogLevel> = {
-      'debug': LogLevel.DEBUG,
-      'info': LogLevel.INFO,
-      'warn': LogLevel.WARN,
-      'error': LogLevel.ERROR
-    };
-    return levels[level.toLowerCase()] ?? LogLevel.INFO;
   }
 
   static async create(options?: BootstrapOptions): Promise<TitanKernelContext> {

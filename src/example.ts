@@ -57,8 +57,9 @@ async function bootstrap() {
     
     const context = await TitanKernel.create({
       autoScan: true,
-      logLevel: 'debug',
-      enableConsoleLogging: true
+      logging: {
+        databaseAccess: false
+      }
     });
 
     console.log('\n📊 Bootstrap Results:');

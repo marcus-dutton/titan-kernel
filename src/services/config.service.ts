@@ -7,9 +7,7 @@ export interface DefaultTitanConfig {
   environment?: string;
   port?: number;
   logging?: {
-    level?: string;
-    enableConsole?: boolean;
-    enableDatabase?: boolean;
+    databaseAccess?: boolean;
   };
   database?: {
     url?: string;
@@ -63,10 +61,7 @@ export class ConfigService<T extends DefaultTitanConfig = DefaultTitanConfig> {
       this.config.database = this.config.database || {};
       this.config.database.url = process.env.DATABASE_URL;
     }
-    if (process.env.LOG_LEVEL) {
-      this.config.logging = this.config.logging || {};
-      this.config.logging.level = process.env.LOG_LEVEL;
-    }
+    // Removed LOG_LEVEL environment variable mapping - log level is now managed internally by TitanLogger
   }
 
   get<K = any>(key: string, defaultValue?: K): K {

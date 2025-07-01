@@ -18,6 +18,7 @@ export { Component } from './decorators/component';
 export { ConfigService } from './services/config.service';
 export { TitanLoggerService, LogLevel } from './services/titan-logger.service';
 export { DatabaseService } from './services/database.service';
+export { SocketService } from './services/socket.service';
 export type { DefaultTitanConfig } from './services/config.service';
 export type { LogEntry, LoggerConfig } from './services/titan-logger.service';
 export type { DatabaseConfig, ModelInfo } from './services/database.service';

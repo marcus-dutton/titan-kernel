@@ -33,7 +33,7 @@ export class ExampleController {
   }
 }
 
-// Example gateway
+// Example gateway with socket integration
 @Gateway({ namespace: '/example' })
 export class ExampleGateway {
   constructor(
@@ -47,6 +47,23 @@ export class ExampleGateway {
     const data = this.exampleService.getData();
     this.logger.info('ExampleGateway', 'Gateway connection', data);
     return data;
+  }
+
+  // Example of how to register socket events when Socket.IO is available
+  registerSocketEvents(context: any) {
+    if (context.socket && context.socket.isReady()) {
+      context.socket.registerEvents((io: any) => {
+        io.on('connection', (socket: any) => {
+          this.logger.info('ExampleGateway', 'Socket client connected', { socketId: socket.id });
+          
+          socket.on('getExample', () => {
+            const data = this.exampleService.getData();
+            socket.emit('exampleData', data);
+            this.logger.debug('ExampleGateway', 'Example data sent to client', { socketId: socket.id, data });
+          });
+        });
+      });
+    }
   }
 }
 
@@ -66,12 +83,21 @@ async function bootstrap() {
     console.log(`Services: ${context.services.size}`);
     console.log(`Controllers: ${context.controllers.length}`);
     console.log(`Gateways: ${context.gateways.length}`);
+    console.log(`Socket Service Available: ${context.socket?.isReady() || false}`);
 
     // Test service resolution
     const exampleService = context.services.get('ExampleService') as ExampleService;
     if (exampleService) {
       const data = exampleService.getData();
       console.log('\n✅ Service test:', data);
+    }
+
+    // Example of how to use socket service (when Socket.IO server is available)
+    if (context.socket) {
+      console.log('\n🔌 Socket Service: Ready for Socket.IO integration');
+      console.log('   To initialize: context.socket.setServer(io)');
+      console.log('   To register events: context.socket.registerEvents((io) => { ... })');
+      console.log('   To broadcast: context.socket.emitToAll(event, data)');
     }
 
     console.log('\n🎉 TitanKernel example completed successfully!');

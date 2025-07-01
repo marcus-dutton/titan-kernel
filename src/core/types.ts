@@ -40,6 +40,7 @@ export interface TitanKernelContext {
   config: any;
   logger: any;
   database?: any;
+  socket?: any;
   services: Map<string, any>;
   controllers: any[];
   gateways: any[];

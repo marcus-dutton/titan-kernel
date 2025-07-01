@@ -77,6 +77,7 @@ async function bootstrap() {
   console.log('Controllers:', context.controllers.length);
   console.log('Gateways:', context.gateways.length);
   console.log('Database Connected:', context.database?.isReady());
+  console.log('Socket Service Available:', context.socket?.isReady());
 }
 
 bootstrap();
@@ -284,6 +285,55 @@ TitanKernel uses a simple configuration approach - just set `databaseAccess` in 
 - Graceful fallback - if database is unavailable, logging continues without persistence
 - Automatic reconnection handling and offline queue for when database is not ready
 
+### Socket Service
+
+Built-in **centralized Socket.IO service** for real-time event handling across your application:
+
+```typescript
+@Injectable()
+export class MyGateway {
+  constructor(private socket: SocketService) {}
+
+  initializeSocketEvents() {
+    // Register socket events (works even if Socket.IO server isn't ready yet)
+    this.socket.registerEvents((io) => {
+      io.on('connection', (clientSocket) => {
+        console.log('Client connected:', clientSocket.id);
+        
+        clientSocket.on('getData', () => {
+          clientSocket.emit('dataResponse', { message: 'Hello!' });
+        });
+      });
+    });
+  }
+
+  broadcastToAll(event: string, data: any) {
+    // Broadcast to all connected clients
+    this.socket.emitToAll(event, data);
+  }
+}
+```
+
+**Integration with Socket.IO Server:**
+```typescript
+// After bootstrap, integrate with your Socket.IO server
+const context = await TitanKernel.create();
+const io = new Server(httpServer);
+
+// Initialize the socket service with your Socket.IO server
+context.socket.setServer(io);
+
+// Socket service is now ready and will process any queued event registrations
+console.log('Socket service ready:', context.socket.isReady());
+```
+
+**Key Features:**
+- **Event Registration Queue**: Register events before Socket.IO server is ready
+- **Automatic Processing**: When `setServer()` is called, all queued registrations are processed
+- **Broadcasting**: Simple API to emit events to all connected clients
+- **Logger Integration**: Automatically connects logger to socket server for real-time log streaming
+- **Gateway Integration**: Perfect for Socket.IO gateways and real-time features
+
 ### Advanced Bootstrap
 
 ```typescript
@@ -313,6 +363,12 @@ const userService = context.services.get('UserService');
 const controllers = context.controllers;
 const gateways = context.gateways;
 const database = context.database;
+const socket = context.socket;
+
+// Initialize Socket.IO server (if you have one)
+// const io = new Server(httpServer);
+// context.socket.setServer(io);
+const socket = context.socket;
 ```
 
 ### Manual Service Resolution

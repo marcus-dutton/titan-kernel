@@ -4,6 +4,7 @@ import { TitanKernelContext, ScanOptions } from '../core/types';
 import { ConfigService } from '../services/config.service';
 import { TitanLoggerService, LogLevel, LoggerConfig } from '../services/titan-logger.service';
 import { DatabaseService, DatabaseConfig } from '../services/database.service';
+import { SocketService } from '../services/socket.service';
 import { fileScanner } from '../utils/file-scanner';
 
 export interface BootstrapOptions {
@@ -18,11 +19,13 @@ export class TitanKernel {
   private config: ConfigService;
   private logger: TitanLoggerService;
   private database?: DatabaseService;
+  private socket: SocketService;
 
   constructor() {
     // Register core services first
     this.config = container.resolve(ConfigService);
     this.logger = container.resolve(TitanLoggerService);
+    this.socket = container.resolve(SocketService);
   }
 
   async bootstrap(options: BootstrapOptions = {}): Promise<TitanKernelContext> {
@@ -67,11 +70,17 @@ export class TitanKernel {
       modules: container.getModules().length
     });
 
+    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'SocketService available for Socket.IO integration', {
+      socketReady: this.socket.isReady(),
+      note: 'Use context.socket.setServer(io) to initialize Socket.IO server'
+    });
+
     const context: TitanKernelContext = {
       container,
       config: this.config,
       logger: this.logger,
       database: this.database,
+      socket: this.socket,
       services: new Map(),
       controllers: container.getControllerClasses(),
       gateways: container.getGatewayClasses(),
@@ -87,7 +96,8 @@ export class TitanKernel {
     this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'TitanKernel bootstrap completed', {
       servicesCount: context.services.size,
       controllersCount: context.controllers.length,
-      gatewaysCount: context.gateways.length
+      gatewaysCount: context.gateways.length,
+      socketServiceReady: this.socket.isReady()
     });
 
     return context;

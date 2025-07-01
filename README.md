@@ -229,8 +229,13 @@ Access config in services:
 @Injectable()
 export class DatabaseService {
   constructor(private config: ConfigService) {
+    // Get specific config values
     const dbUrl = this.config.get('database.url');
     const port = this.config.get('port', 3000);
+    
+    // Or get the entire config object
+    const fullConfig = this.config.getAll();
+    const isProduction = fullConfig.environment?.isProduction || false;
   }
 }
 ```

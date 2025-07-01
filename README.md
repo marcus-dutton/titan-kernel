@@ -2,12 +2,14 @@
 
 Angular-inspired modular backend kernel for Node.js with full dependency injection, circular dependency support, and automatic class scanning.
 
+**Repository:** [https://github.com/marcus-dutton/titan-kernel](https://github.com/marcus-dutton/titan-kernel)
+
 ## Features
 
 - ✅ **Angular-style Dependency Injection** - Full constructor injection with access modifiers
 - ✅ **Circular Dependency Support** - Lazy proxies handle complex dependency chains  
 - ✅ **Automatic Class Scanning** - Zero-config service discovery
-- ✅ **Multiple Decorator Types** - @Injectable, @Controller, @Gateway, @Module
+- ✅ **Multiple Decorator Types** - @Injectable, @Controller, @Gateway, @Module, @Component
 - ✅ **Enhanced Logging** - Built-in logger with Socket.IO integration and database persistence
 - ✅ **Database Integration** - Optional MongoDB logging with configurable persistence flag
 - ✅ **Configuration Management** - Flexible config loading from multiple sources
@@ -117,6 +119,19 @@ export class ChatGateway {
 }
 ```
 
+#### @Component(options?)
+Marks a class as a general component (similar to @Injectable but with additional options).
+
+```typescript
+@Component({ 
+  lifecycle: ServiceLifecycle.SINGLETON,
+  tags: ['business-logic', 'core'] 
+})
+export class BusinessService {
+  constructor(private dataService: DataService) {}
+}
+```
+
 #### @Module(metadata)
 Defines a module with providers, controllers, and gateways.
 
@@ -193,7 +208,6 @@ TitanKernel loads configuration in the following order (later sources override e
 NODE_ENV=production           # → config.environment
 PORT=4000                     # → config.port  
 DATABASE_URL=mongodb://...    # → config.database.url
-LOG_LEVEL=info               # → config.logging.level
 ```
 
 **Project Structure:**
@@ -251,7 +265,7 @@ const context = await TitanKernel.create({
     enableDatabase: true,    // Enable database persistence (default: false)
     enableConsole: true,     // Enable console output (default: true)
     enableSocket: true,      // Enable Socket.IO output (default: true)
-    maxBufferSize: 2000      // Log buffer size (default: 1000)
+    maxBufferSize: 20000     // Log buffer size (default: 10000)
   }
 });
 ```
@@ -292,7 +306,7 @@ const context = await TitanKernel.create({
     enableDatabase: true,
     enableConsole: true,
     enableSocket: true,
-    maxBufferSize: 2000
+    maxBufferSize: 20000    // Higher buffer for active development
   }
 });
 

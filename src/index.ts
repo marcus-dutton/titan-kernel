@@ -12,6 +12,7 @@ export { Injectable } from './decorators/injectable';
 export { Controller } from './decorators/controller';
 export { Gateway } from './decorators/gateway';
 export { Module } from './decorators/module';
+export { Component } from './decorators/component';
 
 // Services
 export { ConfigService } from './services/config.service';

@@ -3,6 +3,11 @@ export interface ServiceOptions {
   factory?: () => any;
 }
 
+export enum ServiceLifecycle {
+  SINGLETON = 'singleton',
+  TRANSIENT = 'transient'
+}
+
 export interface ForwardRef<T = any> {
   __forward_ref__: true;
   forwardRef: () => new (...args: any[]) => T;
@@ -20,7 +25,8 @@ export enum ServiceType {
   INJECTABLE = 'injectable',
   CONTROLLER = 'controller',
   GATEWAY = 'gateway',
-  MODULE = 'module'
+  MODULE = 'module',
+  COMPONENT = 'component'
 }
 
 export interface ServiceMetadata {

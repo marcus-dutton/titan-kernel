@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { Server as SocketIOServer } from 'socket.io';
 
 export enum LogLevel {
+  NONE = -1,
   DEBUG = 0,
   INFO = 1,
   WARN = 2,
@@ -22,15 +23,16 @@ export interface LoggerConfig {
   enableConsole?: boolean;
   enableSocket?: boolean;
   maxBufferSize?: number;
+  logLevel?: LogLevel;
 }
 
 @Injectable()
 export class TitanLoggerService {
-  private logLevel: LogLevel = LogLevel.INFO;
+  private logLevel: LogLevel = LogLevel.NONE;  // Default to NONE (no debug output)
   private socketServer?: SocketIOServer;
   private originalConsole: any = {};
   private logBuffer: LogEntry[] = [];
-  private maxBufferSize: number = 1000;
+  private maxBufferSize: number = 10000;  // Increased from 1000 to 10000 for better development experience
   private consoleEnabled: boolean = true;
   private databaseEnabled: boolean = false;
   private socketEnabled: boolean = true;
@@ -44,7 +46,12 @@ export class TitanLoggerService {
     this.databaseEnabled = config.enableDatabase ?? false;
     this.consoleEnabled = config.enableConsole ?? true;
     this.socketEnabled = config.enableSocket ?? true;
-    this.maxBufferSize = config.maxBufferSize ?? 1000;
+    this.maxBufferSize = config.maxBufferSize ?? 10000;  // Updated default from 1000 to 10000
+    
+    // Set log level if provided, otherwise keep current (defaults to NONE)
+    if (config.logLevel !== undefined) {
+      this.logLevel = config.logLevel;
+    }
     
     if (!this.consoleEnabled) {
       this.restoreConsole();
@@ -55,10 +62,26 @@ export class TitanLoggerService {
 
   setDatabaseReady(ready: boolean): void {
     this.dbReady = ready;
+    
+    // Auto-configure log level based on database availability
+    // If database is ready and we're still at NONE, upgrade to INFO for better visibility
+    if (ready && this.logLevel === LogLevel.NONE && this.databaseEnabled) {
+      this.logLevel = LogLevel.INFO;
+      this.info('🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' }, 'TitanLogger');
+    }
   }
 
   setLogLevel(level: LogLevel): void {
     this.logLevel = level;
+  }
+
+  getLogLevel(): LogLevel {
+    return this.logLevel;
+  }
+
+  // Check if a log level should be output based on current setting
+  private shouldLog(level: LogLevel): boolean {
+    return this.logLevel !== LogLevel.NONE && level >= this.logLevel;
   }
 
   setSocketServer(server: SocketIOServer): void {
@@ -107,7 +130,8 @@ export class TitanLoggerService {
   }
 
   private log(level: LogLevel, message: string, data?: any, source?: string): void {
-    if (level < this.logLevel) return;
+    // Use the new shouldLog method for better control
+    if (!this.shouldLog(level)) return;
 
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),

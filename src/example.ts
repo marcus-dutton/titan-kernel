@@ -12,8 +12,9 @@ export class ExampleService {
   }
 
   getData() {
-    const environment = this.config.get('environment', 'development');
-    this.logger.debug('ExampleService', 'Getting data', { environment });
+    const isProduction = this.config.get('environment.isProduction', false);
+    const environment = isProduction ? 'production' : 'development';
+    this.logger.debug('ExampleService', 'Getting data', { environment, isProduction });
     return { message: `Hello from ${environment}!`, timestamp: new Date() };
   }
 }

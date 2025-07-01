@@ -4,7 +4,9 @@ import * as path from 'path';
 
 // Default TitanKernel configuration interface
 export interface DefaultTitanConfig {
-  environment?: string;
+  environment?: {
+    isProduction?: boolean;
+  };
   port?: number;
   logging?: {
     databaseAccess?: boolean;
@@ -52,7 +54,8 @@ export class ConfigService<T extends DefaultTitanConfig = DefaultTitanConfig> {
   private mergeEnvironmentVariables(): void {
     // Add common environment variables to config
     if (process.env.NODE_ENV) {
-      this.config.environment = process.env.NODE_ENV;
+      this.config.environment = this.config.environment || {};
+      this.config.environment.isProduction = process.env.NODE_ENV === 'production';
     }
     if (process.env.PORT) {
       this.config.port = parseInt(process.env.PORT, 10);

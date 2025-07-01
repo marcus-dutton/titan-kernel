@@ -1,5 +1,7 @@
 {
-  "environment": "development",
+  "environment": {
+    "isProduction": false
+  },
   "port": 3000,
   "logging": {
     "databaseAccess": false

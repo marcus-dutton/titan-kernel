@@ -173,7 +173,9 @@ Create `titan.config.json` in **your project's root directory** (not in the npm 
 
 ```json
 {
-  "environment": "development",
+  "environment": {
+    "isProduction": false
+  },
   "port": 3000,
   "logging": {
     "databaseAccess": false
@@ -201,7 +203,7 @@ TitanKernel loads configuration in the following order (later sources override e
 
 **Environment Variable Mapping:**
 ```bash
-NODE_ENV=production           # → config.environment
+NODE_ENV=production           # → config.environment.isProduction (true if NODE_ENV=production)
 PORT=4000                     # → config.port  
 DATABASE_URL=mongodb://...    # → config.database.url
 ```
@@ -510,7 +512,9 @@ Create your corresponding `titan.config.json`:
 
 ```json
 {
-  "environment": "development",
+  "environment": {
+    "isProduction": false
+  },
   "port": 3000,
   "logging": {
     "databaseAccess": false

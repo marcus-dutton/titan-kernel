@@ -8,12 +8,12 @@ export class ExampleService {
     private config: ConfigService,
     private logger: TitanLoggerService
   ) {
-    this.logger.info('ExampleService initialized', undefined, 'ExampleService');
+    this.logger.info('ExampleService', 'ExampleService initialized');
   }
 
   getData() {
     const environment = this.config.get('environment', 'development');
-    this.logger.debug('Getting data', { environment }, 'ExampleService');
+    this.logger.debug('ExampleService', 'Getting data', { environment });
     return { message: `Hello from ${environment}!`, timestamp: new Date() };
   }
 }
@@ -25,7 +25,7 @@ export class ExampleController {
     private exampleService: ExampleService,
     private logger: TitanLoggerService
   ) {
-    this.logger.info('ExampleController initialized', undefined, 'ExampleController');
+    this.logger.info('ExampleController', 'ExampleController initialized');
   }
 
   getExample() {
@@ -40,12 +40,12 @@ export class ExampleGateway {
     private exampleService: ExampleService,
     private logger: TitanLoggerService
   ) {
-    this.logger.info('ExampleGateway initialized', undefined, 'ExampleGateway');
+    this.logger.info('ExampleGateway', 'ExampleGateway initialized');
   }
 
   handleConnection() {
     const data = this.exampleService.getData();
-    this.logger.info('Gateway connection', data, 'ExampleGateway');
+    this.logger.info('ExampleGateway', 'Gateway connection', data);
     return data;
   }
 }

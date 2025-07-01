@@ -44,7 +44,7 @@ export class TitanKernel {
     
     // Log level is now managed internally by TitanLogger based on config and database readiness
 
-    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel bootstrap started', undefined, 'TitanKernel');
+    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'TitanKernel bootstrap started');
 
     // Initialize database if configuration is provided
     if (database || this.config.get('database.url')) {
@@ -53,19 +53,19 @@ export class TitanKernel {
 
     // Auto-scan for services if enabled
     if (autoScan) {
-      this.logger.logToConsole(LogLevel.DEBUG, 'Starting auto-scan for services...', undefined, 'TitanKernel');
+      this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', 'Starting auto-scan for services...');
       const scannedFiles = await fileScanner.scanForClasses(scanOptions);
-      this.logger.logToConsole(LogLevel.INFO, `Scanned ${scannedFiles.length} files`, { files: scannedFiles }, 'TitanKernel');
+      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', `Scanned ${scannedFiles.length} files`, { files: scannedFiles });
     }
 
     // Log discovered services
     const services = container.getAllServices();
-    this.logger.logToConsole(LogLevel.INFO, `Discovered ${services.length} services`, {
+    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', `Discovered ${services.length} services`, {
       injectables: container.getInjectables().length,
       controllers: container.getControllers().length,
       gateways: container.getGateways().length,
       modules: container.getModules().length
-    }, 'TitanKernel');
+    });
 
     const context: TitanKernelContext = {
       container,
@@ -84,11 +84,11 @@ export class TitanKernel {
       context.services.set(service.name, instance);
     }
 
-    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel bootstrap completed', {
+    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'TitanKernel bootstrap completed', {
       servicesCount: context.services.size,
       controllersCount: context.controllers.length,
       gatewaysCount: context.gateways.length
-    }, 'TitanKernel');
+    });
 
     return context;
   }
@@ -105,11 +105,11 @@ export class TitanKernel {
       };
 
       if (!config.url) {
-        this.logger.logToConsole(LogLevel.WARN, 'No database URL provided, skipping database initialization', undefined, 'TitanKernel');
+        this.logger.logToConsole(LogLevel.WARN, 'TitanKernel', 'No database URL provided, skipping database initialization');
         return;
       }
 
-      this.logger.logToConsole(LogLevel.INFO, 'Connecting to database...', { url: config.url }, 'TitanKernel');
+      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Connecting to database...', { url: config.url });
       
       await this.database.connect(config);
       
@@ -119,14 +119,14 @@ export class TitanKernel {
       // Check and validate models
       try {
         await this.database.checkModels();
-        this.logger.logToConsole(LogLevel.INFO, 'Database models validated successfully', undefined, 'TitanKernel');
+        this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Database models validated successfully');
       } catch (error: any) {
-        this.logger.logToConsole(LogLevel.WARN, 'Model validation warning', { error: error.message }, 'TitanKernel');
+        this.logger.logToConsole(LogLevel.WARN, 'TitanKernel', 'Model validation warning', { error: error.message });
       }
       
-      this.logger.logToConsole(LogLevel.INFO, 'Database connected successfully', undefined, 'TitanKernel');
+      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Database connected successfully');
     } catch (error: any) {
-      this.logger.logToConsole(LogLevel.ERROR, 'Database connection failed', { error: error.message }, 'TitanKernel');
+      this.logger.logToConsole(LogLevel.ERROR, 'TitanKernel', 'Database connection failed', { error: error.message });
       // Don't throw - allow kernel to continue without database
     }
   }

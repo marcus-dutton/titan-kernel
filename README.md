@@ -35,7 +35,7 @@ export class UserService {
     private config: ConfigService,
     private logger: TitanLoggerService
   ) {
-    this.logger.info('UserService initialized', undefined, 'UserService');
+    this.logger.info('UserService', 'UserService initialized');
   }
 
   getUsers() {
@@ -242,10 +242,10 @@ export class MyService {
   constructor(private logger: TitanLoggerService) {}
 
   doSomething() {
-    this.logger.debug('Debug message', { data: 'value' }, 'MyService');
-    this.logger.info('Info message', undefined, 'MyService');
-    this.logger.warn('Warning message', undefined, 'MyService');
-    this.logger.error('Error message', { error: 'details' }, 'MyService');
+    this.logger.debug('MyService', 'Debug message', { data: 'value' });
+    this.logger.info('MyService', 'Info message');
+    this.logger.warn('MyService', 'Warning message');
+    this.logger.error('MyService', 'Error message', { error: 'details' });
     
     // Regular console calls are automatically captured for frontend
     console.log('This will be captured and sent to frontend via Socket.IO');

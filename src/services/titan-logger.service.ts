@@ -86,7 +86,7 @@ export class TitanLoggerService {
         // Database just became ready - auto-upgrade log level if databaseAccess is true
         if (this.databaseAccess && this.logLevel === LogLevel.NONE) {
           this.logLevel = LogLevel.INFO;
-          this.info('🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' }, 'TitanLogger');
+          this.info('TitanLogger', '🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' });
         }
         this.flushQueuedOperations();
       }
@@ -138,24 +138,24 @@ export class TitanLoggerService {
     }
   }
 
-  debug(message: string, data?: any, source?: string): void {
-    this.log(LogLevel.DEBUG, message, data, source);
+  debug(source: string, message: string, data?: any): void {
+    this.log(LogLevel.DEBUG, message, source, data);
   }
 
-  info(message: string, data?: any, source?: string): void {
-    this.log(LogLevel.INFO, message, data, source);
+  info(source: string, message: string, data?: any): void {
+    this.log(LogLevel.INFO, message, source, data);
   }
 
-  warn(message: string, data?: any, source?: string): void {
-    this.log(LogLevel.WARN, message, data, source);
+  warn(source: string, message: string, data?: any): void {
+    this.log(LogLevel.WARN, message, source, data);
   }
 
-  error(message: string, data?: any, source?: string): void {
-    this.log(LogLevel.ERROR, message, data, source);
+  error(source: string, message: string, data?: any): void {
+    this.log(LogLevel.ERROR, message, source, data);
   }
 
   // Method to force output to both console and capture (for kernel logging)
-  logToConsole(level: LogLevel, message: string, data?: any, source?: string): void {
+  logToConsole(level: LogLevel, source: string, message: string, data?: any): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,
@@ -169,7 +169,7 @@ export class TitanLoggerService {
     this.socketOutput(entry);  // Also send to frontend
   }
 
-  private log(level: LogLevel, message: string, data?: any, source?: string): void {
+  private log(level: LogLevel, message: string, source: string, data?: any): void {
     // Use the new shouldLog method for better control
     if (!this.shouldLog(level)) return;
 
@@ -492,7 +492,7 @@ export class TitanLoggerService {
     // If database access is enabled and DB is ready, auto-upgrade log level
     if (this.databaseAccess && this.dbReady && this.logLevel === LogLevel.NONE) {
       this.logLevel = LogLevel.INFO;
-      this.info('🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' }, 'TitanLogger');
+      this.info('TitanLogger', '🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' });
     }
   }
 
@@ -503,7 +503,7 @@ export class TitanLoggerService {
     // If database is ready and we have database access enabled, upgrade to INFO for better visibility
     if (ready && this.logLevel === LogLevel.NONE && this.databaseAccess) {
       this.logLevel = LogLevel.INFO;
-      this.info('🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' }, 'TitanLogger');
+      this.info('TitanLogger', '🔧 Auto-configured log level to INFO (database ready)', { level: 'INFO' });
     }
     
     if (ready) {

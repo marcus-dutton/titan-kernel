@@ -49,8 +49,8 @@ export class TitanKernel {
 
     this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'TitanKernel bootstrap started');
 
-    // Initialize database if configuration is provided
-    if (database || this.config.get('database.url')) {
+    // Always require explicit database config to initialize database
+    if (database) {
       await this.initializeDatabase(database);
     }
 
@@ -120,27 +120,20 @@ export class TitanKernel {
     try {
       this.database = container.resolve(DatabaseService);
 
-      // Use provided config or get from config service
-
-      // Use type assertion to avoid TS errors for dynamic config keys
-      const dbConfigFromSettings = this.config.get('database', {}) as any;
-      // Only use useProductionDatabase from config, do not fallback to environment.isProduction
-      const useProd = !!dbConfigFromSettings.useProductionDatabase;
-
-      const config: DatabaseConfig = databaseConfig || {
-        urlProd: dbConfigFromSettings.urlProd,
-        prodName: dbConfigFromSettings.prodName,
-        urlDev: dbConfigFromSettings.urlDev,
-        devName: dbConfigFromSettings.devName,
-        useProductionDatabase: useProd,
-        options: dbConfigFromSettings.options || {}
-      };
+      if (!databaseConfig || !databaseConfig.type) {
+        throw new Error('Database configuration with explicit type (e.g., "type: mongo" or "type: sql") is required.');
+      }
 
       // Show the resolved config for debugging
-      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Resolved database config:', config);
+      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Resolved database config:', databaseConfig);
 
-      // Check for required URL
-      const url = useProd ? config.urlProd : config.urlDev;
+      // Example: Only support mongo for now
+      if (databaseConfig.type !== 'mongo') {
+        throw new Error(`Unsupported database type: ${databaseConfig.type}. Only "mongo" is currently supported.`);
+      }
+
+      const useProd = databaseConfig.useProductionDatabase;
+      const url = useProd ? databaseConfig.urlProd : databaseConfig.urlDev;
       if (!url) {
         this.logger.logToConsole(LogLevel.WARN, 'TitanKernel', 'No database URL provided, skipping database initialization');
         return;
@@ -148,7 +141,7 @@ export class TitanKernel {
 
       this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Connecting to database...', { url });
 
-      await this.database.connect(config);
+      await this.database.connect(databaseConfig);
 
       // Notify logger that database is ready
       this.logger.setDatabaseReady(this.database.isReady());

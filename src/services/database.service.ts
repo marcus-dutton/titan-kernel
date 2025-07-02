@@ -1,7 +1,9 @@
 import { Injectable } from '../decorators/injectable';
+
 import * as mongoose from 'mongoose';
 
 export interface DatabaseConfig {
+  type: 'mongo' | 'sql' | (string & {});
   urlProd: string;
   prodName?: string;
   urlDev: string;

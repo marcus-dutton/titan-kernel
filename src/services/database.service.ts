@@ -36,9 +36,19 @@ export class DatabaseService {
         ...config.options
       };
       const url = config.useProductionDatabase ? config.urlProd : config.urlDev;
+      // Log the config and url being used for connection
+      console.info('[DatabaseService] Attempting to connect to database with config:', {
+        url,
+        options,
+        type: config.type
+      });
       this.connection = await mongoose.connect(url, options);
       this.isConnected = true;
     } catch (error: any) {
+      console.error('[DatabaseService] Database connection failed:', {
+        error,
+        config
+      });
       throw new Error(`Database connection failed: ${error.message}`);
     }
   }
@@ -51,7 +61,12 @@ export class DatabaseService {
   }
 
   isReady(): boolean {
-    return this.isConnected && mongoose.connection.readyState === 1;
+    if (!this.connection) {
+      // Connection is not established or failed
+      return false;
+    }
+    // Use the connection's readyState if available
+    return this.isConnected && this.connection.connection.readyState === 1;
   }
 
   getConnection(): typeof mongoose | undefined {

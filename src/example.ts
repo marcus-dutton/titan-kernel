@@ -71,14 +71,24 @@ export class ExampleGateway {
 
 // Bootstrap example
 async function bootstrap() {
+  const fs = require('fs');
+  const path = require('path');
   try {
     console.log('🚀 Starting TitanKernel example...');
-    
+
+    // Load config from titan.config.json in the kernel folder
+    const configPath = path.resolve(__dirname, '../titan.config.json');
+    const configRaw = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(configRaw);
+    const databaseConfig = config.database;
+    console.log('[example.ts] Loaded database config:', databaseConfig);
+
     const context = await TitanKernel.create({
       autoScan: true,
       logging: {
         databaseAccess: false
-      }
+      },
+      database: databaseConfig
     });
 
     console.log('\n📊 Bootstrap Results:');
@@ -86,6 +96,12 @@ async function bootstrap() {
     console.log(`Controllers: ${context.controllers.length}`);
     console.log(`Gateways: ${context.gateways.length}`);
     console.log(`Socket Service Available: ${context.socket?.isReady() || false}`);
+
+    // Check DB connection status
+    if (context.database) {
+      const dbReady = context.database.isReady();
+      console.log(`\n🗄️  Database connection ready: ${dbReady}`);
+    }
 
     // Test service resolution
     const exampleService = context.services.get('ExampleService') as ExampleService;

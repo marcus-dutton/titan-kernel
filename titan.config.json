@@ -1,22 +1,52 @@
 {
-  "environment": {
-    "isProduction": false
-  },
-  "port": 3000,
-  "logging": {
-    "databaseAccess": false
-  },
-  "database": {
-    "url": "mongodb+srv://username:password@cluster.mongodb.net/titankernel?retryWrites=true&w=majority",
-    "name": "titankernel",
-    "options": {
-      "maxPoolSize": 10,
-      "serverSelectionTimeoutMS": 5000,
-      "socketTimeoutMS": 45000
+    "environment": {
+        "isProduction": false
+    },
+    "server": {
+        "httpPort": 8000,
+        "httpsPort": 8443
+    },
+    "database": {
+        "urlProd": "mongodb+srv://cash-cow:ZDueegx5hrJV@cluster0.nomretu.mongodb.net/titan_prod?retryWrites=true&w=majority",
+        "prodName": "Titan Prod",
+        "urlDev": "mongodb+srv://cash-cow:ZDueegx5hrJV@cluster0.nomretu.mongodb.net/titan_dev?retryWrites=true&w=majority",
+        "devName": "Titan Dev",
+        "useProductionDatabase": true,
+        "type": "mongo"
+    },
+    "authentication": {
+        "jwtSecret": "secret",
+        "jwtExpiration": "1h"
+    },
+    "cors": {
+        "allowAnyOrigin": true,
+        "allowedOrigins": [
+            "http://localhost:4200",
+            "https://your-production-app.com"
+        ]
+    },
+    "emailSettings": {
+        "enableEmailTransmission": false,
+        "triggerEmailToDevelopmentOnly": true,
+        "server": {
+            "port": 587,
+            "host": "smtp.gmail.com",
+            "auth": {
+                "user": "",
+                "pass": ""
+            }
+        }
+    },
+    "webSockets": {
+        "pingInterval": 25000,
+        "pingTimeout": 5000
+    },
+    "security": {
+        "enableHttps": false,
+        "certificatePassword": "",
+        "serverKeyFileName": ""
+    },
+    "logging": {
+        "databaseAccess": true
     }
-  },
-  "api": {
-    "version": "v1",
-    "prefix": "/api"
-  }
 }

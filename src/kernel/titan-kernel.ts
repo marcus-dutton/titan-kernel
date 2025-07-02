@@ -93,15 +93,16 @@ export class TitanKernel {
       context.services.set(service.name, instance);
     }
 
-    // Execute OnInit lifecycle hooks
+    // Execute OnInit lifecycle hooks on DI-managed instances
     this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', 'Executing OnInit lifecycle hooks...');
     for (const service of services) {
-      if ('onInit' in service && typeof service.onInit === 'function') {
+      const instance = container.resolve(service);
+      if (instance && typeof (instance as any).onInit === 'function') {
         try {
-          await service.onInit();
-          this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', `OnInit completed for ${service.constructor.name}`);
+          await (instance as any).onInit();
+          this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', `OnInit completed for ${service.name || instance.constructor.name}`);
         } catch (error: any) {
-          this.logger.logToConsole(LogLevel.ERROR, 'TitanKernel', `OnInit failed for ${service.constructor.name}`, { error: error.message });
+          this.logger.logToConsole(LogLevel.ERROR, 'TitanKernel', `OnInit failed for ${service.name || instance.constructor.name}`, { error: error.message });
         }
       }
     }

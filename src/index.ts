@@ -34,6 +34,10 @@ export type { BootstrapOptions } from './kernel/titan-kernel';
 // Utils
 export { FileScanner, fileScanner } from './utils/file-scanner';
 
+// Lifecycle hooks
+// titan-kernel/src/index.ts - ADD:
+export { OnInit, OnDestroy, OnApplicationStart, OnApplicationShutdown } from './lifecycle/interfaces';
+
 // Re-export types for convenience
 export type {
   ServiceOptions,

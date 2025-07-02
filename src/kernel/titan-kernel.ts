@@ -44,7 +44,7 @@ export class TitanKernel {
         databaseAccess: false // Default to false unless explicitly enabled
       });
     }
-    
+
     // Log level is now managed internally by TitanLogger based on config and database readiness
 
     this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'TitanKernel bootstrap started');
@@ -93,6 +93,19 @@ export class TitanKernel {
       context.services.set(service.name, instance);
     }
 
+    // Execute OnInit lifecycle hooks
+    this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', 'Executing OnInit lifecycle hooks...');
+    for (const service of services) {
+      if ('onInit' in service && typeof service.onInit === 'function') {
+        try {
+          await service.onInit();
+          this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', `OnInit completed for ${service.constructor.name}`);
+        } catch (error: any) {
+          this.logger.logToConsole(LogLevel.ERROR, 'TitanKernel', `OnInit failed for ${service.constructor.name}`, { error: error.message });
+        }
+      }
+    }
+
     this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'TitanKernel bootstrap completed', {
       servicesCount: context.services.size,
       controllersCount: context.controllers.length,
@@ -106,7 +119,7 @@ export class TitanKernel {
   private async initializeDatabase(databaseConfig?: DatabaseConfig): Promise<void> {
     try {
       this.database = container.resolve(DatabaseService);
-      
+
       // Use provided config or get from config service
       const config = databaseConfig || {
         url: this.config.get('database.url'),
@@ -120,12 +133,12 @@ export class TitanKernel {
       }
 
       this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Connecting to database...', { url: config.url });
-      
+
       await this.database.connect(config);
-      
+
       // Notify logger that database is ready
       this.logger.setDatabaseReady(this.database.isReady());
-      
+
       // Check and validate models
       try {
         await this.database.checkModels();
@@ -133,7 +146,7 @@ export class TitanKernel {
       } catch (error: any) {
         this.logger.logToConsole(LogLevel.WARN, 'TitanKernel', 'Model validation warning', { error: error.message });
       }
-      
+
       this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Database connected successfully');
     } catch (error: any) {
       this.logger.logToConsole(LogLevel.ERROR, 'TitanKernel', 'Database connection failed', { error: error.message });

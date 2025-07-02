@@ -121,18 +121,32 @@ export class TitanKernel {
       this.database = container.resolve(DatabaseService);
 
       // Use provided config or get from config service
-      const config = databaseConfig || {
-        url: this.config.get('database.url'),
-        name: this.config.get('database.name'),
-        options: this.config.get('database.options', {})
+
+      // Use type assertion to avoid TS errors for dynamic config keys
+      const dbConfigFromSettings = this.config.get('database', {}) as any;
+      // Only use useProductionDatabase from config, do not fallback to environment.isProduction
+      const useProd = !!dbConfigFromSettings.useProductionDatabase;
+
+      const config: DatabaseConfig = databaseConfig || {
+        urlProd: dbConfigFromSettings.urlProd,
+        prodName: dbConfigFromSettings.prodName,
+        urlDev: dbConfigFromSettings.urlDev,
+        devName: dbConfigFromSettings.devName,
+        useProductionDatabase: useProd,
+        options: dbConfigFromSettings.options || {}
       };
 
-      if (!config.url) {
+      // Show the resolved config for debugging
+      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Resolved database config:', config);
+
+      // Check for required URL
+      const url = useProd ? config.urlProd : config.urlDev;
+      if (!url) {
         this.logger.logToConsole(LogLevel.WARN, 'TitanKernel', 'No database URL provided, skipping database initialization');
         return;
       }
 
-      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Connecting to database...', { url: config.url });
+      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Connecting to database...', { url });
 
       await this.database.connect(config);
 

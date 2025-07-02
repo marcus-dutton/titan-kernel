@@ -76,12 +76,22 @@ async function bootstrap() {
   try {
     console.log('🚀 Starting TitanKernel example...');
 
+    // Print Node.js and Mongoose versions
+    const mongoose = require('mongoose');
+    console.log(`[example.ts] Node.js version: ${process.version}`);
+    console.log(`[example.ts] Mongoose version: ${mongoose.version}`);
+
     // Load config from titan.config.json in the kernel folder
     const configPath = path.resolve(__dirname, '../titan.config.json');
     const configRaw = fs.readFileSync(configPath, 'utf-8');
     const config = JSON.parse(configRaw);
     const databaseConfig = config.database;
     console.log('[example.ts] Loaded database config:', databaseConfig);
+
+    // Print the exact URL and options that will be passed to mongoose.connect
+    const url = databaseConfig.useProductionDatabase ? databaseConfig.urlProd : databaseConfig.urlDev;
+    const options = databaseConfig.options || {};
+    console.log('[example.ts] Will connect to MongoDB with:', { url, options });
 
     const context = await TitanKernel.create({
       autoScan: true,
@@ -120,7 +130,12 @@ async function bootstrap() {
 
     console.log('\n🎉 TitanKernel example completed successfully!');
   } catch (error) {
-    console.error('❌ Bootstrap failed:', error);
+    if (error instanceof Error) {
+      console.error('❌ Bootstrap failed:', error.message);
+      console.error('❌ Full error stack:', error.stack);
+    } else {
+      console.error('❌ Bootstrap failed:', error);
+    }
   }
 }
 

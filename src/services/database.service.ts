@@ -65,8 +65,10 @@ export class DatabaseService {
       // Connection is not established or failed
       return false;
     }
-    // Use the connection's readyState if available
-    return this.isConnected && this.connection.connection.readyState === 1;
+    // For Mongoose 8.x, the connection state is on this.connection.connection.readyState,
+    // but if undefined, fallback to mongoose.connection.readyState
+    const readyState = this.connection.connection?.readyState;
+    return this.isConnected && readyState === 1;
   }
 
   getConnection(): typeof mongoose | undefined {

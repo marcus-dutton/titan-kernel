@@ -26,7 +26,7 @@ LogEntrySchema.index({ "$**": 1 });
 // Apply TransformMongoose utility for consistent JSON output
 TransformMongoose(LogEntrySchema, { removeFields: [] });
 
-export const LogEntry = mongoose.model<ILogEntry>('TitanLogEntry', LogEntrySchema);
+export const LogEntry = mongoose.model<ILogEntry>('Backend_Logging_Logs', LogEntrySchema);
 // #endregion
 
 // #region LogConfig Mongoose Schema
@@ -44,5 +44,5 @@ const LogConfigSchema = new mongoose.Schema<LogConfig>({
 // Apply TransformMongoose utility for consistent JSON output
 TransformMongoose(LogConfigSchema, { removeFields: [] });
 
-export const LogConfig = mongoose.model<ILoggingConfig>('TitanLogConfig', LogConfigSchema);
+export const LogConfig = mongoose.model<ILoggingConfig>('Backend_Logging_Config', LogConfigSchema);
 // #endregion

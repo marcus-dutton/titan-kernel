@@ -10,10 +10,19 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 - ✅ **Circular Dependency Support** - Lazy proxies handle complex dependency chains  
 - ✅ **Automatic Class Scanning** - Zero-config service discovery
 - ✅ **Multiple Decorator Types** - @Injectable, @Controller, @Gateway, @Module, @Component
-- ✅ **Enhanced Logging** - Built-in logger with Socket.IO integration and database persistence
+- ✅ **Enterprise Logging** - Advanced logger with class-based controls, offline queuing, and real-time broadcasting
 - ✅ **Database Integration** - Optional MongoDB logging with configurable persistence flag
+- ✅ **Mongoose Utilities** - TransformMongoose for consistent JSON transformations
 - ✅ **Configuration Management** - Flexible config loading from multiple sources
 - ✅ **TypeScript Native** - Full type safety and decorator support
+
+## What's New in v1.2.0 🎉
+
+- **🚀 Enterprise Logging System** - Complete rewrite with class-based controls, offline queuing, and real-time broadcasting
+- **🛠️ TransformMongoose Utility** - Consistent JSON transformations for Mongoose schemas with `_id` → `id` conversion
+- **📊 Advanced Logger Features** - Database operation queuing, container integration, and persistent configuration
+- **⚡ Real-time Log Streaming** - Live log broadcasting via Socket.IO for development and monitoring
+- **🔧 Auto-configuration** - Intelligent log level adjustment based on database availability
 
 ## Installation
 
@@ -443,6 +452,93 @@ Ensure your `tsconfig.json` includes:
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true
   }
+}
+```
+
+## Enhanced Logging Features
+
+TitanKernel v1.2.0 includes a completely enhanced logging system with enterprise-grade features:
+
+### Advanced Logger Capabilities
+
+- **Class-based Log Controls** - Enable/disable logging per service class
+- **Database Operation Queuing** - Offline-capable with automatic queue processing
+- **Real-time Event Broadcasting** - Live log streaming via Socket.IO
+- **Container Integration** - Automatic discovery of injectable classes
+- **Persistent Configuration** - Database-stored logging preferences
+- **Console Capture** - Unlimited buffering for large file processing
+- **Auto-configuration** - Intelligent log level adjustment based on environment
+
+```typescript
+import { TitanLoggerService, LogLevel } from '@titan/kernel';
+
+@Injectable()
+export class MyService {
+  constructor(private logger: TitanLoggerService) {}
+
+  initializeService() {
+    // Configure logging for specific classes
+    this.logger.enableLoggingForClass('MyService');
+    this.logger.setGlobalLogLevel(LogLevel.INFO);
+    
+    // Use structured logging
+    this.logger.info('MyService', 'Service initialized', { 
+      timestamp: new Date(),
+      environment: process.env.NODE_ENV 
+    });
+  }
+}
+```
+
+### Logger Configuration
+
+```json
+{
+  "logging": {
+    "databaseAccess": true,
+    "enableConsole": true,
+    "enableSocket": true
+  }
+}
+```
+
+## TransformMongoose Utility
+
+New in v1.2.0! Consistent JSON transformation for Mongoose schemas:
+
+```typescript
+import { TransformMongoose, ToJSONOptions } from '@titan/kernel';
+import { Schema, model } from 'mongoose';
+
+const UserSchema = new Schema({
+  name: String,
+  email: String,
+  password: String,
+  createdAt: { type: Date, default: Date.now }
+});
+
+// Apply consistent JSON transformation
+TransformMongoose(UserSchema, {
+  removeFields: ['password'],  // Remove sensitive fields
+  virtuals: true              // Include virtual properties
+});
+
+export const User = model('User', UserSchema);
+
+// JSON output will automatically have:
+// - ret.id instead of ret._id
+// - No __v field
+// - No password field
+// - Included virtuals
+```
+
+### TransformMongoose Options
+
+```typescript
+interface ToJSONOptions {
+  removeFields?: string[];           // Additional fields to remove
+  additionalTransform?: (doc: any, ret: any) => any; // Custom transform
+  virtuals?: boolean;               // Include virtual properties
 }
 ```
 

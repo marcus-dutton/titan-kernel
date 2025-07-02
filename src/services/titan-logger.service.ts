@@ -1,26 +1,21 @@
 import { Injectable } from '../decorators/injectable';
 import chalk from 'chalk';
 import { Server as SocketIOServer } from 'socket.io';
+import { LogLevel } from '../interfaces/logging.interface';
+import { LogEntry, LogConfig } from '../models/log.model';
+import { Subject, BehaviorSubject, filter } from 'rxjs';
 
-export enum LogLevel {
-  NONE = -1,
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3
-}
-
-export interface LogEntry {
-  timestamp: string;
-  level: LogLevel;
-  message: string;
-  data?: any;
-  source?: string;
-}
+// Re-export LogLevel for external consumers
+export { LogLevel };
 
 export interface LoggerConfig {
   databaseAccess?: boolean;
+  enableConsole?: boolean;
+  enableSocket?: boolean;
 }
+
+// Event emitter for log updates
+export const logUpdateEmitter = new Subject<void>();
 
 @Injectable()
 export class TitanLoggerService {
@@ -32,10 +27,20 @@ export class TitanLoggerService {
   private consoleEnabled: boolean = true;
   private databaseAccess: boolean = false;  // Read from config
   private socketEnabled: boolean = true;
-  private dbReady: boolean = false;
   private consoleCapturingStarted: boolean = false;
   private offlineQueue: LogEntry[] = [];
   private operationQueue: (() => Promise<void>)[] = [];
+  
+  // New properties for class-specific logging
+  private readonly logSubject = new Subject<LogEntry>();
+  private readonly dbReady = new BehaviorSubject<boolean>(false);
+  private readonly className = this.constructor.name;
+  private availableClasses: Set<string> = new Set();
+  private enabledClasses: Set<string> = new Set();
+  private alwaysEnabledClass: string = 'TitanKernel';
+  private eventNamespace: any;
+  private ioService: any;
+  private container: any;
 
   constructor() {
     this.initialize();
@@ -47,6 +52,39 @@ export class TitanLoggerService {
     
     this.captureConsole();
     this.setupDatabaseConnectionWatcher();
+    await this.initializeContainer();
+    await this.updateAvailableClassesFromDI();
+    await this.loadConfigFromDb();
+    this.setupOfflineBufferProcessor();
+  }
+
+  private async initializeContainer(): Promise<void> {
+    // Get container and socket service after delay to avoid circular deps
+    setTimeout(() => {
+      try {
+        // Dynamic import to get container
+        import('../core/container').then(({ container }) => {
+          this.container = container;
+          this.debug(this.className, 'Container reference obtained');
+        }).catch(() => {
+          // Silently fail if container not available
+        });
+
+        // Get socket service from container
+        const services = (global as any).titanContainer?.services || new Map();
+        const singletons = (global as any).titanContainer?.singletons || new Map();
+        
+        for (const service of [...services.values(), ...singletons.values()]) {
+          if (service?.constructor?.name === 'SocketService') {
+            this.ioService = service;
+            this.debug(this.className, 'SocketService reference obtained');
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not initialize container references:', err);
+      }
+    }, 500);
   }
 
   private async loadConfigFromFile(): Promise<void> {
@@ -77,12 +115,13 @@ export class TitanLoggerService {
   private setupDatabaseConnectionWatcher(): void {
     // Check for database availability periodically
     const checkConnection = () => {
-      // This would be connected to actual database connection
-      // For now, assume database is ready if databaseAccess is enabled
-      const wasReady = this.dbReady;
-      this.dbReady = this.databaseAccess; // Simplified for now
+      // Check actual database connection using LogEntry model
+      const wasReady = this.dbReady.value;
+      const isConnected = this.databaseAccess && LogEntry?.db?.readyState === 1;
       
-      if (this.dbReady && !wasReady) {
+      this.dbReady.next(isConnected);
+      
+      if (isConnected && !wasReady) {
         // Database just became ready - auto-upgrade log level if databaseAccess is true
         if (this.databaseAccess && this.logLevel === LogLevel.NONE) {
           this.logLevel = LogLevel.INFO;
@@ -93,11 +132,21 @@ export class TitanLoggerService {
     };
 
     checkConnection();
+
+    // Set up database event listeners if available
+    if (LogEntry?.db) {
+      LogEntry.db.on('connected', () => {
+        this.dbReady.next(true);
+        this.flushQueuedOperations();
+      });
+      LogEntry.db.on('disconnected', () => this.dbReady.next(false));
+    }
+
     setInterval(checkConnection, 30000); // Check every 30 seconds
   }
 
   private async queueDatabaseOperation(operation: () => Promise<void>): Promise<void> {
-    if (this.dbReady && this.databaseAccess) {
+    if (this.dbReady.value && this.databaseAccess) {
       await operation();
     } else {
       this.operationQueue.push(operation);
@@ -156,13 +205,13 @@ export class TitanLoggerService {
 
   // Method to force output to both console and capture (for kernel logging)
   logToConsole(level: LogLevel, source: string, message: string, data?: any): void {
-    const entry: LogEntry = {
-      timestamp: new Date().toISOString(),
+    const entry = new LogEntry({
+      timestamp: new Date(),
       level,
       message,
       data,
       source
-    };
+    });
 
     this.addToBuffer(entry);
     this.consoleOutput(entry); // Always output to console
@@ -170,18 +219,23 @@ export class TitanLoggerService {
   }
 
   private log(level: LogLevel, message: string, source: string, data?: any): void {
-    // Use the new shouldLog method for better control
-    if (!this.shouldLog(level)) return;
+    // Allow if source is always-enabled class or meets criteria
+    if ((level > this.logLevel || !this.enabledClasses.has(source)) && 
+        source !== this.alwaysEnabledClass) {
+      return;
+    }
 
-    const entry: LogEntry = {
-      timestamp: new Date().toISOString(),
+    const entry = new LogEntry({
+      timestamp: new Date(),
       level,
       message,
       data,
       source
-    };
+    });
 
     this.addToBuffer(entry);
+    this.logSubject.next(entry);
+    logUpdateEmitter.next();
     
     // Only output to console if not from console source to prevent recursion
     if (this.consoleEnabled && source !== 'console') {
@@ -192,11 +246,10 @@ export class TitanLoggerService {
       this.socketOutput(entry);
     }
 
-    // Database persistence when enabled and ready
-    if (this.databaseAccess && this.dbReady) {
+    // Database persistence
+    if (this.databaseAccess && this.dbReady.value) {
       this.databaseOutput(entry);
     } else if (this.databaseAccess) {
-      // Queue for later if database not ready
       this.offlineQueue.push(entry);
     }
   }
@@ -268,9 +321,9 @@ export class TitanLoggerService {
   private async databaseOutput(entry: LogEntry): Promise<void> {
     try {
       // Dynamic import to avoid dependency issues if mongoose not installed
-      const { LogModel } = await import('../models/log.model');
+      const { LogEntry } = await import('../models/log.model');
       
-      await LogModel.create({
+      await LogEntry.create({
         timestamp: new Date(entry.timestamp),
         level: entry.level,
         message: entry.message,
@@ -497,7 +550,7 @@ export class TitanLoggerService {
   }
 
   setDatabaseReady(ready: boolean): void {
-    this.dbReady = ready;
+    this.dbReady.next(ready);
     
     // Auto-configure log level based on database availability
     // If database is ready and we have database access enabled, upgrade to INFO for better visibility
@@ -508,6 +561,159 @@ export class TitanLoggerService {
     
     if (ready) {
       this.flushQueuedOperations();
+    }
+  }
+
+  // 🔥 Missing method: Load LogConfig from database
+  private async loadConfigFromDb(): Promise<void> {
+    await this.queueDatabaseOperation(async () => {
+      try {
+        const config = await LogConfig.findOne({ _id: 'config' }).lean();
+
+        if (config) {
+          this.logLevel = config.globalLogLevel;
+          this.availableClasses = new Set(config.availableClasses);
+          this.enabledClasses = new Set(config.enabledClasses);
+          this.availableClasses.add(this.alwaysEnabledClass);
+        } else {
+          // Create default config
+          await LogConfig.create({
+            _id: 'config',
+            globalLogLevel: LogLevel.NONE,
+            availableClasses: [...this.availableClasses, this.alwaysEnabledClass],
+            enabledClasses: [this.alwaysEnabledClass],
+            uiToggleStates: {},
+            lastModified: new Date(),
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to load config from database:', error);
+      }
+    });
+  }
+
+  // 🔥 Missing method: Update available classes from DI container
+  private async updateAvailableClassesFromDI(): Promise<void> {
+    try {
+      if (this.container?.findAllClasses) {
+        const allClasses = await this.container.findAllClasses();
+        const allClassNames = allClasses.map((cls: any) => cls.name);
+        this.availableClasses = new Set(allClassNames);
+        this.availableClasses.add(this.alwaysEnabledClass);
+
+        this.enabledClasses = new Set(
+          Array.from(this.enabledClasses).filter(cls =>
+            this.availableClasses.has(cls) || cls === this.alwaysEnabledClass
+          )
+        );
+
+        await this.queueDatabaseOperation(async () => {
+          await LogConfig.findByIdAndUpdate(
+            'config',
+            {
+              availableClasses: [...this.availableClasses],
+              lastModified: new Date(),
+            },
+            { upsert: true }
+          );
+        });
+      }
+    } catch (err) {
+      this.error(this.className, 'Failed to update available classes from DI', err);
+    }
+  }
+
+  // 🔥 Missing method: Setup offline buffer processor
+  private setupOfflineBufferProcessor(): void {
+    this.dbReady.pipe(
+      filter(ready => ready && this.offlineQueue.length > 0)
+    ).subscribe(async () => {
+      while (this.offlineQueue.length > 0) {
+        const batch = this.offlineQueue.splice(0, 100);
+        try {
+          await LogEntry.insertMany(batch);
+          this.broadcastLogs();
+        } catch (error) {
+          console.error('Failed to process offline queue:', error);
+        }
+      }
+    });
+  }
+
+  // 🔥 Missing method: Set global log level
+  setGlobalLogLevel(level: LogLevel): void {
+    this.logLevel = level;
+    this.info(this.className, `Setting globalLogLevel to: ${LogLevel[level]}`);
+    this.queueDatabaseOperation(async () => {
+      await LogConfig.findByIdAndUpdate('config', {
+        globalLogLevel: level,
+        lastModified: new Date(),
+      });
+    });
+  }
+
+  // 🔥 Missing method: Enable logging for specific class
+  enableLoggingForClass(className: string): void {
+    this.enabledClasses.add(className);
+    this.info(this.className, `Enabling logging for class: ${className}`);
+    this.queueDatabaseOperation(async () => {
+      await LogConfig.findByIdAndUpdate('config', {
+        $addToSet: { enabledClasses: className },
+        lastModified: new Date(),
+      });
+    });
+  }
+
+  // 🔥 Missing method: Disable logging for specific class
+  disableLoggingForClass(className: string): void {
+    this.enabledClasses.delete(className);
+    this.info(this.className, `Disabling logging for class: ${className}`);
+    this.queueDatabaseOperation(async () => {
+      await LogConfig.findByIdAndUpdate('config', {
+        $pull: { enabledClasses: className },
+        lastModified: new Date(),
+      });
+    });
+  }
+
+  // 🔥 Missing method: Sync registered classes
+  async syncRegisteredClasses(detectedClasses: string[]): Promise<void> {
+    this.queueDatabaseOperation(async () => {
+      this.availableClasses = new Set(detectedClasses);
+      this.availableClasses.add(this.alwaysEnabledClass);
+
+      this.enabledClasses = new Set(
+        Array.from(this.enabledClasses).filter(cls =>
+          detectedClasses.includes(cls) || cls === this.alwaysEnabledClass
+        )
+      );
+
+      await LogConfig.findByIdAndUpdate('config', {
+        availableClasses: [...this.availableClasses],
+        enabledClasses: [...this.enabledClasses],
+        lastModified: new Date(),
+      });
+    });
+  }
+
+  // 🔥 Missing method: Broadcast logs to clients
+  async broadcastLogs(): Promise<void> {
+    try {
+      if (!this.eventNamespace || !this.ioService?.emitToAll) return;
+
+      const logs = await LogEntry.find({})
+        .sort({ timestamp: -1 })
+        .limit(1000);
+
+      const response = {
+        success: true,
+        data: logs,
+        message: 'Logs broadcasted successfully'
+      };
+
+      this.ioService.emitToAll(this.eventNamespace.GetLogsResponse, response);
+    } catch (err) {
+      console.error('Failed to broadcast logs:', err);
     }
   }
 }

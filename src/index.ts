@@ -16,16 +16,18 @@ export { Component } from './decorators/component';
 
 // Services
 export { ConfigService } from './services/config.service';
-export { TitanLoggerService, LogLevel } from './services/titan-logger.service';
+export { TitanLoggerService } from './services/titan-logger.service';
 export { DatabaseService } from './services/database.service';
 export { SocketService } from './services/socket.service';
 export type { DefaultTitanConfig } from './services/config.service';
-export type { LogEntry, LoggerConfig } from './services/titan-logger.service';
+
 export type { DatabaseConfig, ModelInfo } from './services/database.service';
 
 // Models
-export { LogModel } from './models/log.model';
-export type { ILogDocument } from './models/log.model';
+export { LogLevel } from './interfaces/logging.interface';
+export type { ILogEntry, ILoggingConfig } from './interfaces/logging.interface';
+export { LogEntry } from './models/log.model';
+export { LogConfig } from './models/log.model';
 
 // Kernel
 export { TitanKernel } from './kernel/titan-kernel';
@@ -33,6 +35,8 @@ export type { BootstrapOptions } from './kernel/titan-kernel';
 
 // Utils
 export { FileScanner, fileScanner } from './utils/file-scanner';
+export { TransformMongoose } from './utils/transform-mongoose';
+export type { ToJSONOptions } from './utils/transform-mongoose';
 
 // Lifecycle hooks
 // titan-kernel/src/index.ts - ADD:

@@ -1,30 +1,48 @@
-import { Schema, model, Document } from 'mongoose';
-import { LogLevel } from '../services/titan-logger.service';
+import mongoose, { Schema, Model } from 'mongoose';
+import { ILogEntry, ILoggingConfig, LogLevel } from '../interfaces/logging.interface';
+import { TransformMongoose } from '../utils/transform-mongoose';
 
-export interface ILogDocument extends Document {
-  timestamp: Date;
-  level: LogLevel;
-  message: string;
-  data?: any;
-  source?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// #region LogEntry Mongoose Schema
+export interface LogEntry extends ILogEntry {}
 
-const LogSchema = new Schema({
-  timestamp: { type: Date, required: true },
-  level: { type: Number, required: true },
+const LogEntrySchema = new mongoose.Schema<LogEntry>({
+  timestamp: { type: Date, default: Date.now, required: true },
+  level: {
+    type: Number,
+    enum: Object.values(LogLevel).filter((v) => typeof v === 'number'),
+    required: true,
+  },
+  source: { type: String, required: true },
   message: { type: String, required: true },
-  data: { type: Schema.Types.Mixed },
-  source: { type: String },
-}, {
-  timestamps: true,
-  collection: 'titan_logs'
+  data: { type: mongoose.Schema.Types.Mixed, default: null },
 });
 
-// Add indexes for efficient querying
-LogSchema.index({ timestamp: -1 });
-LogSchema.index({ level: 1 });
-LogSchema.index({ source: 1 });
+LogEntrySchema.index({ source: 'text', message: 'text' });
+LogEntrySchema.index({ timestamp: 1 });
+LogEntrySchema.index({ level: 1, timestamp: -1 });
+LogEntrySchema.index({ source: 1, timestamp: -1 });
+LogEntrySchema.index({ "$**": 1 });
 
-export const LogModel = model<ILogDocument>('TitanLog', LogSchema);
+// Apply TransformMongoose utility for consistent JSON output
+TransformMongoose(LogEntrySchema, { removeFields: [] });
+
+export const LogEntry = mongoose.model<ILogEntry>('TitanLogEntry', LogEntrySchema);
+// #endregion
+
+// #region LogConfig Mongoose Schema
+export interface LogConfig extends ILoggingConfig {}
+
+const LogConfigSchema = new mongoose.Schema<LogConfig>({
+  _id: { type: String, required: true },
+  globalLogLevel: { type: Number, enum: Object.values(LogLevel), required: true, default: LogLevel.NONE },
+  availableClasses: { type: [String], default: [] },
+  enabledClasses: { type: [String], default: [] },
+  uiToggleStates: { type: Map, of: Boolean, default: {} },
+  lastModified: { type: Date, default: Date.now },
+});
+
+// Apply TransformMongoose utility for consistent JSON output
+TransformMongoose(LogConfigSchema, { removeFields: [] });
+
+export const LogConfig = mongoose.model<ILoggingConfig>('TitanLogConfig', LogConfigSchema);
+// #endregion

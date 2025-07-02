@@ -2,8 +2,11 @@ import { Injectable } from '../decorators/injectable';
 import * as mongoose from 'mongoose';
 
 export interface DatabaseConfig {
-  url: string;
-  name?: string;
+  urlProd: string;
+  prodName?: string;
+  urlDev: string;
+  devName?: string;
+  useProductionDatabase?: boolean;
   options?: mongoose.ConnectOptions;
 }
 
@@ -30,8 +33,8 @@ export class DatabaseService {
       const options: mongoose.ConnectOptions = {
         ...config.options
       };
-
-      this.connection = await mongoose.connect(config.url, options);
+      const url = config.useProductionDatabase ? config.urlProd : config.urlDev;
+      this.connection = await mongoose.connect(url, options);
       this.isConnected = true;
     } catch (error: any) {
       throw new Error(`Database connection failed: ${error.message}`);

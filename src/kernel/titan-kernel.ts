@@ -73,14 +73,14 @@ export class TitanKernel {
 
     // Log discovered services
     const services = container.getAllServices();
-    this.logger.info('TitanKernel', `Discovered ${services.length} services`, {
+    this.logger.verbose(`Discovered ${services.length} services`, {
       injectables: container.getInjectables().length,
       controllers: container.getControllers().length,
       gateways: container.getGateways().length,
       modules: container.getModules().length
     });
 
-    this.logger.verbose('SocketService available for Socket.IO integration', {
+    this.logger.verbose('[TitanKernel] SocketService available for Socket.IO integration', {
       socketReady: this.socket.isReady(),
       note: 'Use context.socket.setServer(io) to initialize Socket.IO server'
     });
@@ -177,8 +177,8 @@ export class TitanKernel {
         this.logger.warn('TitanKernel', 'No database URL provided, skipping database initialization');
         return;
       }
-
-      this.logger.info('TitanKernel', 'Connecting to database...', { url });
+      this.logger.info('TitanKernel', 'Connecting to database...');
+      this.logger.verbose('[TitanKernel]Connecting to database...', { url });
 
       await this.database.connect(databaseConfig);
 

@@ -47,6 +47,7 @@
         "serverKeyFileName": ""
     },
     "logging": {
-        "databaseAccess": true
+        "databaseAccess": true,
+        "logLevel": 4
     }
 }

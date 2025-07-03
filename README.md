@@ -187,7 +187,8 @@ Create `titan.config.json` in **your project's root directory** (not in the npm 
   },
   "port": 3000,
   "logging": {
-    "databaseAccess": false
+    "databaseAccess": false,
+    "logLevel": "DEBUG" // or use a number, e.g. 4
   },
   "database": {
     "url": "mongodb+srv://username:password@cluster.mongodb.net/myapp?retryWrites=true&w=majority",
@@ -204,6 +205,15 @@ Create `titan.config.json` in **your project's root directory** (not in the npm 
   }
 }
 ```
+
+**Logging Levels:**
+
+The `logLevel` option controls which logs are output when the database is not available (or before DB config loads). Accepts either a string or a number:
+
+- String values: `NONE`, `INFO`, `WARN`, `ERROR`, `DEBUG`, `VERBOSE`
+- Numeric values: `0` = NONE, `1` = INFO, `2` = WARN, `3` = ERROR, `4` = DEBUG, `5` = VERBOSE
+
+When the database is available, the log level will be loaded from the database config and override this value.
 
 **Configuration Priority:**
 TitanKernel loads configuration in the following order (later sources override earlier ones):

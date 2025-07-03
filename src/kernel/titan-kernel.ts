@@ -36,18 +36,22 @@ export class TitanKernel {
       logging: loggerConfig
     } = options;
 
-    // Configure logger early - simplified configuration
-    if (loggerConfig) {
-      this.logger.configure(loggerConfig);
-    } else {
-      this.logger.configure({
-        databaseAccess: false // Default to false unless explicitly enabled
-      });
+    // Configure logger early: set log level from config if present, else DEBUG (4)
+    let initialLogLevel = LogLevel.DEBUG;
+    if (loggerConfig && typeof loggerConfig.logLevel === 'number') {
+      initialLogLevel = loggerConfig.logLevel as LogLevel;
+    } else if (loggerConfig && typeof loggerConfig.logLevel === 'string') {
+      const logLevelKey = loggerConfig.logLevel.toUpperCase() as keyof typeof LogLevel;
+      if (LogLevel[logLevelKey] !== undefined) {
+        initialLogLevel = LogLevel[logLevelKey] as LogLevel;
+      }
     }
+    this.logger.configure({ ...loggerConfig, logLevel: initialLogLevel });
 
     // Log level is now managed internally by TitanLogger based on config and database readiness
+    // When DB config loads, it will override this if available
+    this.logger.info('TitanKernel', `TitanKernel bootstrap started (logLevel: ${LogLevel[this.logger.getLogLevel()]} = ${this.logger.getLogLevel()})`);
 
-    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'TitanKernel bootstrap started');
 
     // Always require explicit database config to initialize database
     if (database) {
@@ -61,22 +65,22 @@ export class TitanKernel {
 
     // Auto-scan for services if enabled
     if (autoScan) {
-      this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', 'Starting auto-scan for services...');
+      this.logger.debug('TitanKernel', 'Starting auto-scan for services...');
       const scannedFiles = await fileScanner.scanForClasses(scanOptions);
-      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', `Scanned ${scannedFiles.length} files`);
+      this.logger.info('TitanKernel', `Scanned ${scannedFiles.length} files`);
       this.logger.verbose('Scanned files detail', { files: scannedFiles });
     }
 
     // Log discovered services
     const services = container.getAllServices();
-    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', `Discovered ${services.length} services`, {
+    this.logger.info('TitanKernel', `Discovered ${services.length} services`, {
       injectables: container.getInjectables().length,
       controllers: container.getControllers().length,
       gateways: container.getGateways().length,
       modules: container.getModules().length
     });
 
-    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'SocketService available for Socket.IO integration', {
+    this.logger.info('TitanKernel', 'SocketService available for Socket.IO integration', {
       socketReady: this.socket.isReady(),
       note: 'Use context.socket.setServer(io) to initialize Socket.IO server'
     });
@@ -124,15 +128,15 @@ export class TitanKernel {
     });
 
     // Execute OnInit lifecycle hooks on DI-managed instances
-    this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', 'Executing OnInit lifecycle hooks...');
+    this.logger.debug('TitanKernel', 'Executing OnInit lifecycle hooks...');
     for (const service of services) {
       const instance = container.resolve(service);
       if (instance && typeof (instance as any).onInit === 'function') {
         try {
           await (instance as any).onInit();
-          this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', `OnInit completed for ${service.name || instance.constructor.name}`);
+          this.logger.debug('TitanKernel', `OnInit completed for ${service.name || instance.constructor.name}`);
         } catch (error: any) {
-          this.logger.logToConsole(LogLevel.ERROR, 'TitanKernel', `OnInit failed for ${service.name || instance.constructor.name}`, { error: error.message });
+          this.logger.error('TitanKernel', `OnInit failed for ${service.name || instance.constructor.name}`, { error: error.message });
         }
       }
     }
@@ -156,39 +160,42 @@ export class TitanKernel {
       }
 
       // Show the resolved config for debugging
-      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Resolved database config');
+      this.logger.info('TitanKernel', 'Resolved database config');
       this.logger.verbose('Database config detail', databaseConfig);
 
       // Example: Only support mongo for now
+
       if (databaseConfig.type !== 'mongo') {
         throw new Error(`Unsupported database type: ${databaseConfig.type}. Only "mongo" is currently supported.`);
       }
 
       const useProd = databaseConfig.useProductionDatabase;
       const url = useProd ? databaseConfig.urlProd : databaseConfig.urlDev;
+
       if (!url) {
-        this.logger.logToConsole(LogLevel.WARN, 'TitanKernel', 'No database URL provided, skipping database initialization');
+        this.logger.warn('TitanKernel', 'No database URL provided, skipping database initialization');
         return;
       }
 
-      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Connecting to database...', { url });
+      this.logger.info('TitanKernel', 'Connecting to database...', { url });
 
       await this.database.connect(databaseConfig);
 
       // Notify logger that database is ready
       this.logger.setDatabaseReady(this.database.isReady());
 
+
       // Check and validate models
       try {
         await this.database.checkModels();
-        this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Database models validated successfully');
+        this.logger.info('TitanKernel', 'Database models validated successfully');
       } catch (error: any) {
-        this.logger.logToConsole(LogLevel.WARN, 'TitanKernel', 'Model validation warning', { error: error.message });
+        this.logger.warn('TitanKernel', 'Model validation warning', { error: error.message });
       }
 
-      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Database connected successfully');
+      this.logger.info('TitanKernel', 'Database connected successfully');
     } catch (error: any) {
-      this.logger.logToConsole(LogLevel.ERROR, 'TitanKernel', 'Database connection failed', { error: error.message });
+      this.logger.error('TitanKernel', 'Database connection failed', { error: error.message });
       // Don't throw - allow kernel to continue without database
     }
   }

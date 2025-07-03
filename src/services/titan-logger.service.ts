@@ -172,9 +172,17 @@ export class TitanLoggerService {
   // Check if a log should be output based on class and level
   // Verbose-aware shouldLog logic
   public shouldLog(level: LogLevel, source: string): boolean {
-    if (this.enableVerbose) return true;
+    // Diagnostic output for log filtering
+    const orange = chalk.hex('#FFA500').bold; // Bright orange
+    const inputInfo = `shouldLog called with level=${LogLevel[level]} (${level}), source=${source}, logLevel=${LogLevel[this.logLevel]} (${this.logLevel}), enableVerbose=${this.enableVerbose}, enabledClasses=[${[...this.enabledClasses].join(', ')}]`;
+    if (this.enableVerbose) {
+      console.log(orange(`[shouldLog] ${inputInfo} => true (enableVerbose)`));
+      return true;
+    }
     const classEnabled = this.enabledClasses.has(source) || source === this.alwaysEnabledClass;
-    return classEnabled && this.logLevel !== LogLevel.NONE && level >= this.logLevel;
+    const result = classEnabled && this.logLevel !== LogLevel.NONE && level >= this.logLevel;
+    console.log(orange(`[shouldLog] ${inputInfo} => ${result}`));
+    return result;
   }
 
   setSocketServer(server: SocketIOServer): void {

@@ -298,33 +298,35 @@ export class TitanLoggerService {
     }
   }
 
-  private consoleOutput(entry: LogEntry): void {
-    // Format timestamp as mm/dd/yyyy: HH:MM:ss
-    const dateObj = new Date(entry.timestamp);
-    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const dd = String(dateObj.getDate()).padStart(2, '0');
-    const yyyy = dateObj.getFullYear();
-    const HH = String(dateObj.getHours()).padStart(2, '0');
-    const MM = String(dateObj.getMinutes()).padStart(2, '0');
-    const ss = String(dateObj.getSeconds()).padStart(2, '0');
-    const timestamp = chalk.gray(`${mm}/${dd}/${yyyy}: ${HH}:${MM}:${ss}`);
-    const source = entry.source ? chalk.cyan(`[${entry.source}]`) : '';
-    const levelColor = this.getLevelColor(entry.level);
-    const levelText = LogLevel[entry.level].padEnd(5);
-    
-    let output = `${timestamp} ${levelColor(levelText)} ${source} ${entry.message}`;
-    
-    if (entry.data !== undefined) {
-      output += '\n' + chalk.gray(JSON.stringify(entry.data, null, 2));
-    }
+  private async consoleOutput(entry: LogEntry): Promise<void> {
+    setImmediate(() => {
+      // Format timestamp as mm/dd/yyyy: HH:MM:ss
+      const dateObj = new Date(entry.timestamp);
+      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(dateObj.getDate()).padStart(2, '0');
+      const yyyy = dateObj.getFullYear();
+      const HH = String(dateObj.getHours()).padStart(2, '0');
+      const MM = String(dateObj.getMinutes()).padStart(2, '0');
+      const ss = String(dateObj.getSeconds()).padStart(2, '0');
+      const timestamp = chalk.gray(`${mm}/${dd}/${yyyy}: ${HH}:${MM}:${ss}`);
+      const source = entry.source ? chalk.cyan(`[${entry.source}]`) : '';
+      const levelColor = this.getLevelColor(entry.level);
+      const levelText = LogLevel[entry.level].padEnd(5);
+      
+      let output = `${timestamp} ${levelColor(levelText)} ${source} ${entry.message}`;
+      
+      if (entry.data !== undefined) {
+        output += '\n' + chalk.gray(JSON.stringify(entry.data, null, 2));
+      }
 
-    // Use original console to prevent infinite recursion
-    if (this.originalConsole.log) {
-      this.originalConsole.log(output);
-    } else {
-      // Fallback if original console is not available
-      process.stdout.write(output + '\n');
-    }
+      // Use original console to prevent infinite recursion
+      if (this.originalConsole.log) {
+        this.originalConsole.log(output);
+      } else {
+        // Fallback if original console is not available
+        process.stdout.write(output + '\n');
+      }
+    });
   }
 
   private socketOutput(entry: LogEntry): void {

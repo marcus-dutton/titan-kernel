@@ -109,6 +109,20 @@ export class TitanKernel {
       context.services.set(service.name, instance);
     }
 
+    // VERBOSE LOG: TitanKernel context after bootstrap
+    this.logger.verbose('TitanKernel context after bootstrap', {
+      keys: Object.keys(context),
+      context: {
+        ...context,
+        // Avoid circular references and large objects in logs if needed
+        services: Array.from(context.services.keys()),
+        controllers: context.controllers,
+        gateways: context.gateways,
+        modules: context.modules,
+        components: context.components
+      }
+    });
+
     // Execute OnInit lifecycle hooks on DI-managed instances
     this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', 'Executing OnInit lifecycle hooks...');
     for (const service of services) {

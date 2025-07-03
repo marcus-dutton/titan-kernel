@@ -180,7 +180,8 @@ export class TitanLoggerService {
       return true;
     }
     const classEnabled = this.enabledClasses.has(source) || source === this.alwaysEnabledClass;
-    const result = classEnabled && this.logLevel !== LogLevel.NONE && level >= this.logLevel;
+    // Only log if logLevel is not NONE (0), and the log's level is less than or equal to the current logLevel
+    const result = classEnabled && this.logLevel !== LogLevel.NONE && level <= this.logLevel;
     console.log(orange(`[shouldLog] ${inputInfo} => ${result}`));
     return result;
   }

@@ -54,11 +54,17 @@ export class TitanKernel {
       await this.initializeDatabase(database);
     }
 
+    // Optionally enable verbose logging for file lists and similar details
+    if (options && (options as any).enableVerbose === true) {
+      this.logger.enableVerbose = true;
+    }
+
     // Auto-scan for services if enabled
     if (autoScan) {
       this.logger.logToConsole(LogLevel.DEBUG, 'TitanKernel', 'Starting auto-scan for services...');
       const scannedFiles = await fileScanner.scanForClasses(scanOptions);
-      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', `Scanned ${scannedFiles.length} files`, { files: scannedFiles });
+      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', `Scanned ${scannedFiles.length} files`);
+      this.logger.verbose('Scanned files detail', { files: scannedFiles });
     }
 
     // Log discovered services
@@ -136,7 +142,8 @@ export class TitanKernel {
       }
 
       // Show the resolved config for debugging
-      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Resolved database config:', databaseConfig);
+      this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'Resolved database config');
+      this.logger.verbose('Database config detail', databaseConfig);
 
       // Example: Only support mongo for now
       if (databaseConfig.type !== 'mongo') {

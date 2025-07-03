@@ -6,6 +6,7 @@ export enum LogLevel {
   ERROR = 2,
   WARN = 3,
   DEBUG = 4,
+  VERBOSE = 5,
 }
 
 // Extend Document for Mongoose compatibility

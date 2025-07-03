@@ -1,3 +1,9 @@
+  /**
+   * Log a verbose message (LogLevel.VERBOSE, source 'Verbose')
+   */
+  verbose(message: string, data?: any): void {
+    this.log(LogLevel.VERBOSE, message, 'Verbose', data);
+  }
 import { Injectable } from '../decorators/injectable';
 import chalk from 'chalk';
 import { Server as SocketIOServer } from 'socket.io';
@@ -20,6 +26,7 @@ export const logUpdateEmitter = new Subject<void>();
 @Injectable()
 export class TitanLoggerService {
   private logLevel: LogLevel = LogLevel.NONE;  // Default to NONE (silent)
+  public enableVerbose: boolean = false; // Verbose logging toggle
   private socketServer?: SocketIOServer;
   private originalConsole: any = {};
   private logBuffer: LogEntry[] = [];
@@ -169,9 +176,11 @@ export class TitanLoggerService {
   }
 
   // Check if a log should be output based on class and level
-  // TEMP: Disable shouldLog logic and log everything for debugging
+  // Verbose-aware shouldLog logic
   public shouldLog(level: LogLevel, source: string): boolean {
-    return true;
+    if (this.enableVerbose) return true;
+    const classEnabled = this.enabledClasses.has(source) || source === this.alwaysEnabledClass;
+    return classEnabled && this.logLevel !== LogLevel.NONE && level >= this.logLevel;
   }
 
   setSocketServer(server: SocketIOServer): void {
@@ -188,8 +197,14 @@ export class TitanLoggerService {
     }
   }
 
+
   debug(source: string, message: string, data?: any): void {
     this.log(LogLevel.DEBUG, message, source, data);
+  }
+
+  verbose(message: string, data?: any): void {
+    // Always use 'Verbose' as the source for verbose logs
+    this.log(LogLevel.VERBOSE, message, 'Verbose', data);
   }
 
   info(source: string, message: string, data?: any): void {

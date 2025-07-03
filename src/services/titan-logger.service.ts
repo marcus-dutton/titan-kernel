@@ -350,21 +350,33 @@ export class TitanLoggerService {
   }
 
   private async databaseOutput(entry: LogEntry): Promise<void> {
-    try {
-      // Dynamic import to avoid dependency issues if mongoose not installed
-      const { LogEntry } = await import('../models/log.model');
-      
-      await LogEntry.create({
-        timestamp: new Date(entry.timestamp),
-        level: entry.level,
-        message: entry.message,
-        data: entry.data,
-        source: entry.source
-      });
-    } catch (error) {
-      // Silently fail database logging to prevent logging loops
-      console.warn('Failed to save log to database:', error);
+    const maxAttempts = 3;
+    let attempt = 0;
+    let lastError = null;
+    while (attempt < maxAttempts) {
+      try {
+        // Dynamic import to avoid dependency issues if mongoose not installed
+        const { LogEntry } = await import('../models/log.model');
+        await LogEntry.create({
+          timestamp: new Date(entry.timestamp),
+          level: entry.level,
+          message: entry.message,
+          data: entry.data,
+          source: entry.source
+        });
+        return; // Success
+      } catch (error) {
+        lastError = error;
+        attempt++;
+        if (attempt < maxAttempts) {
+          // Wait 1 second before retrying
+          await new Promise(res => setTimeout(res, 1000));
+        }
+      }
     }
+    // After retries, log warning and queue for offline processing
+    console.warn('Failed to save log to database after retries:', lastError);
+    this.offlineQueue.push(entry);
   }
 
   private flushBuffer(): void {

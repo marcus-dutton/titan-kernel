@@ -80,7 +80,7 @@ export class TitanKernel {
       modules: container.getModules().length
     });
 
-    this.logger.info('TitanKernel', 'SocketService available for Socket.IO integration', {
+    this.logger.verbose('SocketService available for Socket.IO integration', {
       socketReady: this.socket.isReady(),
       note: 'Use context.socket.setServer(io) to initialize Socket.IO server'
     });

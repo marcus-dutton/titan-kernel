@@ -141,7 +141,8 @@ export class TitanKernel {
       }
     }
 
-    this.logger.logToConsole(LogLevel.INFO, 'TitanKernel', 'TitanKernel bootstrap completed', {
+    // Only log this summary at VERBOSE level
+    this.logger.verbose('TitanKernel bootstrap completed', {
       servicesCount: context.services.size,
       controllersCount: context.controllers.length,
       gatewaysCount: context.gateways.length,

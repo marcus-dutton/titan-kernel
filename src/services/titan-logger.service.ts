@@ -328,9 +328,9 @@ export class TitanLoggerService {
       const levelText = LogLevel[entry.level].padEnd(5);
       
       let output = `${timestamp} ${levelColor(levelText)} ${source} ${entry.message}`;
-      
-      if (entry.data !== undefined) {
-        output += '\n' + chalk.gray(JSON.stringify(entry.data, null, 2));
+      // Only print data if it is not null or undefined
+      if (entry.data !== undefined && entry.data !== null) {
+        output += '\n' + chalk.greenBright(JSON.stringify(entry.data, null, 2));
       }
 
       // Use original console to prevent infinite recursion

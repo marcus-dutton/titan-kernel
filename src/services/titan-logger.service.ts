@@ -292,7 +292,15 @@ export class TitanLoggerService {
   }
 
   private consoleOutput(entry: LogEntry): void {
-    const timestamp = chalk.gray(entry.timestamp);
+    // Format timestamp as mm/dd/yyyy: HH:MM:ss
+    const dateObj = new Date(entry.timestamp);
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const yyyy = dateObj.getFullYear();
+    const HH = String(dateObj.getHours()).padStart(2, '0');
+    const MM = String(dateObj.getMinutes()).padStart(2, '0');
+    const ss = String(dateObj.getSeconds()).padStart(2, '0');
+    const timestamp = chalk.gray(`${mm}/${dd}/${yyyy}: ${HH}:${MM}:${ss}`);
     const source = entry.source ? chalk.cyan(`[${entry.source}]`) : '';
     const levelColor = this.getLevelColor(entry.level);
     const levelText = LogLevel[entry.level].padEnd(5);

@@ -45,6 +45,10 @@ export interface TitanKernelContext {
   controllers: any[];
   gateways: any[];
   modules: any[];
+  /**
+   * All @Component classes managed by the DI container.
+   */
+  components?: any[];
 }
 
 export interface ScanOptions {

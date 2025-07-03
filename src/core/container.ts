@@ -93,6 +93,32 @@ export class DIContainer {
   getGatewayClasses(): any[] {
     return this.getGateways().map(m => m.target);
   }
+
+  /**
+   * Returns all @Component classes registered in the DI container.
+   */
+  getComponentClasses(): any[] {
+    return this.getComponents().map(m => m.target);
+  }
+
+  /**
+   * Returns all DI-managed classes: injectables, controllers, gateways, modules, and components.
+   */
+  findAllClasses(): any[] {
+    const all = [
+      ...this.getInjectableClasses(),
+      ...this.getControllerClasses(),
+      ...this.getGatewayClasses(),
+      ...this.getModules().map((m: any) => m.target),
+      ...this.getComponentClasses()
+    ];
+    // Remove duplicates (in case a class is registered under multiple types)
+    return Array.from(new Set(all));
+  }
+
+  getComponents(): ServiceMetadata[] {
+    return Array.from(this.metadata.values()).filter(m => m.type === ServiceType.COMPONENT);
+  }
 }
 
 export const container = new DIContainer();

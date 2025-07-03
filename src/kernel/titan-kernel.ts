@@ -75,8 +75,14 @@ export class TitanKernel {
       note: 'Use context.socket.setServer(io) to initialize Socket.IO server'
     });
 
-    // Update available classes in logger after DI is ready
-    await this.logger.updateAvailableClassesFromDI();
+
+    // --- Ensure available classes are updated after DI and DB are ready ---
+    if (!database || (this.database && this.database.isReady())) {
+      await this.logger.updateAvailableClassesFromDI();
+    } else {
+      // If DB is not configured or not ready, still update from DI
+      await this.logger.updateAvailableClassesFromDI();
+    }
 
     const context: TitanKernelContext = {
       container,
@@ -87,7 +93,8 @@ export class TitanKernel {
       services: new Map(),
       controllers: container.getControllerClasses(),
       gateways: container.getGatewayClasses(),
-      modules: container.getModules().map(m => m.target)
+      modules: container.getModules().map(m => m.target),
+      components: container.getComponentClasses()
     };
 
     // Populate services map

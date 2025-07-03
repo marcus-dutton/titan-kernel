@@ -1,6 +1,6 @@
 {
   "name": "@marcus-dutton/titan-kernel",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "Angular-inspired modular backend kernel for Node.js with full dependency injection",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

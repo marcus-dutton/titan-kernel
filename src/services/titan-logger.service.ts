@@ -169,10 +169,9 @@ export class TitanLoggerService {
   }
 
   // Check if a log should be output based on class and level
+  // TEMP: Disable shouldLog logic and log everything for debugging
   public shouldLog(level: LogLevel, source: string): boolean {
-    // Only log if source is enabled (or alwaysEnabledClass) and level >= globalLogLevel
-    const classEnabled = this.enabledClasses.has(source) || source === this.alwaysEnabledClass;
-    return classEnabled && this.logLevel !== LogLevel.NONE && level >= this.logLevel;
+    return true;
   }
 
   setSocketServer(server: SocketIOServer): void {
@@ -639,6 +638,12 @@ export class TitanLoggerService {
             this.availableClasses.has(cls) || cls === this.alwaysEnabledClass
           )
         );
+
+        // Only add TitanKernel if not already the alwaysEnabledClass
+        if (this.alwaysEnabledClass !== 'TitanKernel') {
+          this.availableClasses.add('TitanKernel');
+        }
+        this.availableClasses.add('BootStrapVOID');
 
         await this.queueDatabaseOperation(async () => {
           await LogConfig.findByIdAndUpdate(

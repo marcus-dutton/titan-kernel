@@ -82,11 +82,12 @@ async function bootstrap() {
     }
   });
 
-  console.log('Services:', context.services.size);
-  console.log('Controllers:', context.controllers.length);
-  console.log('Gateways:', context.gateways.length);
-  console.log('Database Connected:', context.database?.isReady());
-  console.log('Socket Service Available:', context.socket?.isReady());
+  // All log output now goes through the logger and respects logLevel and class-based filtering
+  context.logger.info('Example', `Services: ${context.services.size}`);
+  context.logger.info('Example', `Controllers: ${context.controllers.length}`);
+  context.logger.info('Example', `Gateways: ${context.gateways.length}`);
+  context.logger.info('Example', `Database Connected: ${context.database?.isReady()}`);
+  context.logger.info('Example', `Socket Service Available: ${context.socket?.isReady()}`);
 }
 
 bootstrap();
@@ -206,24 +207,27 @@ Create `titan.config.json` in **your project's root directory** (not in the npm 
 }
 ```
 
-**Logging Levels:**
 
-The `logLevel` option controls which logs are output when the database is not available (or before DB config loads). Accepts either a string or a number:
+**Logging Levels and Filtering:**
+
+The `logLevel` option controls which logs are output. Accepts either a string or a number:
 
 - String values: `NONE`, `INFO`, `WARN`, `ERROR`, `DEBUG`, `VERBOSE`
 - Numeric values: `0` = NONE, `1` = INFO, `2` = WARN, `3` = ERROR, `4` = DEBUG, `5` = VERBOSE
 
-When the database is available, the log level will be loaded from the database config and override this value.
+**Log filtering:** Only logs with a level less than or equal to the configured `logLevel` are shown. Setting `NONE` disables all logs. All logs (including bootstrap summaries) now respect the configured log level and enabled classes. You can also enable/disable logging for specific classes.
 
-**Configuration Priority:**
-TitanKernel loads configuration in the following order (later sources override earlier ones):
-1. `titan.config.json` file in project root
-2. Environment variables (automatically mapped)
+**Override order:**
+1. Database config (if available) takes precedence
+2. Otherwise, value from `titan.config.json` is used
+
+**Retry logic:**
+If database logging is enabled and a log write fails, the logger will retry up to 3 times (with 1s delay). If all attempts fail, the log is queued for later persistence.
 
 **Environment Variable Mapping:**
 ```bash
 NODE_ENV=production           # → config.environment.isProduction (true if NODE_ENV=production)
-PORT=4000                     # → config.port  
+PORT=4000                     # → config.port
 DATABASE_URL=mongodb://...    # → config.database.url
 ```
 
@@ -259,9 +263,14 @@ export class DatabaseService {
 }
 ```
 
+
 ### Logging
 
-Built-in enhanced logger with **automatic console capture**, **unlimited buffer for large files**, and **optional database persistence**:
+TitanKernel provides a robust, configurable logger with:
+- **Log levels:** `NONE`, `INFO`, `WARN`, `ERROR`, `DEBUG`, `VERBOSE` (use as string or number)
+- **Class-based filtering:** Enable/disable logs for specific classes
+- **Retry logic:** Automatic retry and queuing for DB log persistence
+- **All logs go through the logger:** No direct `console.log` in services or kernel
 
 ```typescript
 @Injectable()
@@ -269,47 +278,43 @@ export class MyService {
   constructor(private logger: TitanLoggerService) {}
 
   doSomething() {
+    this.logger.verbose('MyService', 'Verbose message for deep diagnostics');
     this.logger.debug('MyService', 'Debug message', { data: 'value' });
     this.logger.info('MyService', 'Info message');
     this.logger.warn('MyService', 'Warning message');
     this.logger.error('MyService', 'Error message', { error: 'details' });
-    
-    // Regular console calls are automatically captured for frontend
-    console.log('This will be captured and sent to frontend via Socket.IO');
+    // All logs are filtered by logLevel and class-based settings
   }
 }
 ```
 
-**Simplified Configuration:**
-TitanKernel uses a simple configuration approach - just set `databaseAccess` in your config file:
+**Class-based log control:**
+```typescript
+// Enable or disable logging for a specific class
+logger.enableLoggingForClass('MyService');
+logger.disableLoggingForClass('OtherService');
+```
 
+**No direct console.log:**
+All logging in services and kernel must use the logger. Console output is reserved for logger internals and example/demo code only.
+
+
+**Configuration Example:**
 ```json
 {
   "logging": {
-    "databaseAccess": false
+    "databaseAccess": true,
+    "logLevel": "VERBOSE"
   }
 }
 ```
 
+
 **Runtime Behavior:**
-- **Log Level**: Defaults to `NONE` (silent)
-- **Console Capture**: Always enabled (can be toggled at runtime)
-- **Socket.IO**: Always enabled for real-time frontend updates
-- **Database Access**: Controlled by config file
-- **Auto-Upgrade**: When `databaseAccess: true` and database is ready, log level automatically upgrades to `INFO`
-
-**Console Capture & Large File Support:**
-- All `console.log()`, `console.warn()`, `console.error()`, `console.info()` calls are automatically captured
-- **Unlimited buffer size** - handles large data streams (10MB+ files, Puppeteer blobs, etc.)
-- Captured console output is sent to frontend via Socket.IO for real-time debugging
-- TitanKernel's own logging still appears in console while user console calls are captured
-- No infinite recursion - smart filtering prevents logging loops
-
-**Database Persistence:**
-- **Off by default** - set `"databaseAccess": true` to persist logs to MongoDB
-- Logs are stored in `titan_logs` collection with timestamps, levels, and metadata
-- Graceful fallback - if database is unavailable, logging continues without persistence
-- Automatic reconnection handling and offline queue for when database is not ready
+- **Log Level**: Defaults to `DEBUG` (4) unless overridden; DB config takes precedence
+- **Class-based filtering**: Only enabled classes output logs
+- **Retry logic**: DB log writes are retried up to 3 times, then queued
+- **No direct console.log**: All logs go through the logger
 
 ### Socket Service
 
@@ -469,15 +474,15 @@ Ensure your `tsconfig.json` includes:
 
 TitanKernel v1.2.0 includes a completely enhanced logging system with enterprise-grade features:
 
+
 ### Advanced Logger Capabilities
 
-- **Class-based Log Controls** - Enable/disable logging per service class
-- **Database Operation Queuing** - Offline-capable with automatic queue processing
-- **Real-time Event Broadcasting** - Live log streaming via Socket.IO
-- **Container Integration** - Automatic discovery of injectable classes
-- **Persistent Configuration** - Database-stored logging preferences
-- **Console Capture** - Unlimited buffering for large file processing
-- **Auto-configuration** - Intelligent log level adjustment based on environment
+- **LogLevel.VERBOSE**: Deep diagnostics, only shown if logLevel is set to VERBOSE (5)
+- **Class-based Log Controls**: Enable/disable logging per service class
+- **Database Operation Queuing**: Offline-capable with automatic queue processing and retry
+- **Real-time Event Broadcasting**: Live log streaming via Socket.IO
+- **Persistent Configuration**: Database-stored logging preferences
+- **No direct console.log**: All logs go through the logger
 
 ```typescript
 import { TitanLoggerService, LogLevel } from '@titan/kernel';
@@ -489,9 +494,10 @@ export class MyService {
   initializeService() {
     // Configure logging for specific classes
     this.logger.enableLoggingForClass('MyService');
-    this.logger.setGlobalLogLevel(LogLevel.INFO);
+    this.logger.setGlobalLogLevel(LogLevel.VERBOSE);
     
     // Use structured logging
+    this.logger.verbose('MyService', 'Verbose diagnostics');
     this.logger.info('MyService', 'Service initialized', { 
       timestamp: new Date(),
       environment: process.env.NODE_ENV 

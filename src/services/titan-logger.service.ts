@@ -53,7 +53,7 @@ export class TitanLoggerService {
     this.captureConsole();
     this.setupDatabaseConnectionWatcher();
     await this.initializeContainer();
-    await this.updateAvailableClassesFromDI();
+    // updateAvailableClassesFromDI should be called after DI is ready (in kernel)
     await this.loadConfigFromDb();
     this.setupOfflineBufferProcessor();
   }
@@ -168,9 +168,11 @@ export class TitanLoggerService {
     return this.logLevel;
   }
 
-  // Check if a log level should be output based on current setting
-  private shouldLog(level: LogLevel): boolean {
-    return this.logLevel !== LogLevel.NONE && level >= this.logLevel;
+  // Check if a log should be output based on class and level
+  public shouldLog(level: LogLevel, source: string): boolean {
+    // Only log if source is enabled (or alwaysEnabledClass) and level >= globalLogLevel
+    const classEnabled = this.enabledClasses.has(source) || source === this.alwaysEnabledClass;
+    return classEnabled && this.logLevel !== LogLevel.NONE && level >= this.logLevel;
   }
 
   setSocketServer(server: SocketIOServer): void {
@@ -205,6 +207,7 @@ export class TitanLoggerService {
 
   // Method to force output to both console and capture (for kernel logging)
   logToConsole(level: LogLevel, source: string, message: string, data?: any): void {
+    if (!this.shouldLog(level, source)) return;
     const entry = new LogEntry({
       timestamp: new Date(),
       level,
@@ -212,18 +215,14 @@ export class TitanLoggerService {
       data,
       source
     });
-
     this.addToBuffer(entry);
     this.consoleOutput(entry); // Always output to console
     this.socketOutput(entry);  // Also send to frontend
   }
 
   private log(level: LogLevel, message: string, source: string, data?: any): void {
-    // Allow if source is always-enabled class or meets criteria
-    if ((level > this.logLevel || !this.enabledClasses.has(source)) && 
-        source !== this.alwaysEnabledClass) {
-      return;
-    }
+    // Only log if shouldLog returns true
+    if (!this.shouldLog(level, source)) return;
 
     const entry = new LogEntry({
       timestamp: new Date(),
@@ -459,41 +458,57 @@ export class TitanLoggerService {
     // Override console methods with formatting like your original
     const shouldSkip = (args: any[]) => {
       // Skip if all args are null, undefined, or empty string
-      return args.length === 0 || args.every(arg => arg === null || arg === undefined || (typeof arg === 'string' && arg.trim() === ''));
+      if (args.length === 0) return true;
+      // If all args are null/undefined/empty string, skip
+      if (args.every(arg => arg === null || arg === undefined || (typeof arg === 'string' && arg.trim() === ''))) return true;
+      // If only one arg and it's exactly 'null' or 'undefined' as a string, skip
+      if (args.length === 1 && (args[0] === null || args[0] === undefined)) return true;
+      return false;
     };
 
     console.log = (...args: any[]) => {
       if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('log', args);
-      this.addToConsoleBuffer(formatted);
+      // Only add to buffer if formatted is not just 'null' or 'undefined' (as string)
+      if (formatted && formatted.trim() !== 'null' && formatted.trim() !== 'undefined' && formatted.trim() !== `${chalk.gray('[object Object]')}`) {
+        this.addToConsoleBuffer(formatted);
+      }
       this.originalConsole.log(...args);
     };
 
     console.info = (...args: any[]) => {
       if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('info', args);
-      this.addToConsoleBuffer(formatted);
+      if (formatted && formatted.trim() !== 'null' && formatted.trim() !== 'undefined' && formatted.trim() !== `${chalk.gray('[object Object]')}`) {
+        this.addToConsoleBuffer(formatted);
+      }
       this.originalConsole.info(...args);
     };
 
     console.warn = (...args: any[]) => {
       if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('warn', args);
-      this.addToConsoleBuffer(formatted);
+      if (formatted && formatted.trim() !== 'null' && formatted.trim() !== 'undefined' && formatted.trim() !== `${chalk.gray('[object Object]')}`) {
+        this.addToConsoleBuffer(formatted);
+      }
       this.originalConsole.warn(...args);
     };
 
     console.error = (...args: any[]) => {
       if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('error', args);
-      this.addToConsoleBuffer(formatted);
+      if (formatted && formatted.trim() !== 'null' && formatted.trim() !== 'undefined' && formatted.trim() !== `${chalk.gray('[object Object]')}`) {
+        this.addToConsoleBuffer(formatted);
+      }
       this.originalConsole.error(...args);
     };
 
     console.debug = (...args: any[]) => {
       if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('debug', args);
-      this.addToConsoleBuffer(formatted);
+      if (formatted && formatted.trim() !== 'null' && formatted.trim() !== 'undefined' && formatted.trim() !== `${chalk.gray('[object Object]')}`) {
+        this.addToConsoleBuffer(formatted);
+      }
       this.originalConsole.debug(...args);
     };
 
@@ -611,7 +626,7 @@ export class TitanLoggerService {
   }
 
   // 🔥 Missing method: Update available classes from DI container
-  private async updateAvailableClassesFromDI(): Promise<void> {
+  public async updateAvailableClassesFromDI(): Promise<void> {
     try {
       if (this.container?.findAllClasses) {
         const allClasses = await this.container.findAllClasses();

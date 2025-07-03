@@ -75,6 +75,9 @@ export class TitanKernel {
       note: 'Use context.socket.setServer(io) to initialize Socket.IO server'
     });
 
+    // Update available classes in logger after DI is ready
+    await this.logger.updateAvailableClassesFromDI();
+
     const context: TitanKernelContext = {
       container,
       config: this.config,

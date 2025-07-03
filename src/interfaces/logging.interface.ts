@@ -2,9 +2,9 @@ import { Document, Schema } from 'mongoose';
 
 export enum LogLevel {
   NONE = 0,
-  ERROR = 1,
-  WARN = 2,
-  INFO = 3,
+  INFO = 1,
+  ERROR = 2,
+  WARN = 3,
   DEBUG = 4,
 }
 

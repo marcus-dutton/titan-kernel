@@ -408,16 +408,16 @@ export class TitanLoggerService {
 
   private formatConsoleArgs(level: string, args: any[]): string {
     const timestamp = new Date().toLocaleString();
-    const levelColors: Record<string, string> = {
-      log: '\x1b[0m',    // No color for log
-      info: '\x1b[94m',  // Bright blue
-      warn: '\x1b[33m',  // Yellow
-      error: '\x1b[31m', // Red
-      debug: '\x1b[95m', // Magenta
+    // Use chalk for all coloring
+    const levelChalk: Record<string, (msg: string) => string> = {
+      log: chalk.white,
+      info: chalk.blueBright,
+      warn: chalk.yellow,
+      error: chalk.red,
+      debug: chalk.magenta,
     };
 
-    const color = levelColors[level] || '\x1b[0m';
-    const resetColor = '\x1b[0m';
+    const colorFn = levelChalk[level] || chalk.white;
 
     // Format arguments to strings, preserving objects and complex types
     const formattedArgs = args.map(arg => {
@@ -434,8 +434,8 @@ export class TitanLoggerService {
       }
     }).join(' ');
 
-    // Return formatted string with ANSI colors preserved
-    return `${color}[${timestamp}] [${level.toUpperCase()}]: ${formattedArgs}${resetColor}`;
+    // Return formatted string with chalk colors
+    return `${chalk.gray(`[${timestamp}]`)} ${colorFn(`[${level.toUpperCase()}]`)}: ${formattedArgs}`;
   }
 
   // Method to start console capturing (matching your original)
@@ -457,31 +457,41 @@ export class TitanLoggerService {
     this.addToConsoleBuffer(`[${new Date().toISOString()}] Console capture started - TitanKernel logging initialized`);
 
     // Override console methods with formatting like your original
+    const shouldSkip = (args: any[]) => {
+      // Skip if all args are null, undefined, or empty string
+      return args.length === 0 || args.every(arg => arg === null || arg === undefined || (typeof arg === 'string' && arg.trim() === ''));
+    };
+
     console.log = (...args: any[]) => {
+      if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('log', args);
       this.addToConsoleBuffer(formatted);
       this.originalConsole.log(...args);
     };
 
     console.info = (...args: any[]) => {
+      if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('info', args);
       this.addToConsoleBuffer(formatted);
       this.originalConsole.info(...args);
     };
 
     console.warn = (...args: any[]) => {
+      if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('warn', args);
       this.addToConsoleBuffer(formatted);
       this.originalConsole.warn(...args);
     };
 
     console.error = (...args: any[]) => {
+      if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('error', args);
       this.addToConsoleBuffer(formatted);
       this.originalConsole.error(...args);
     };
 
     console.debug = (...args: any[]) => {
+      if (shouldSkip(args)) return;
       const formatted = this.formatConsoleArgs('debug', args);
       this.addToConsoleBuffer(formatted);
       this.originalConsole.debug(...args);

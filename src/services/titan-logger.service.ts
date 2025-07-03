@@ -1,9 +1,3 @@
-  /**
-   * Log a verbose message (LogLevel.VERBOSE, source 'Verbose')
-   */
-  verbose(message: string, data?: any): void {
-    this.log(LogLevel.VERBOSE, message, 'Verbose', data);
-  }
 import { Injectable } from '../decorators/injectable';
 import chalk from 'chalk';
 import { Server as SocketIOServer } from 'socket.io';

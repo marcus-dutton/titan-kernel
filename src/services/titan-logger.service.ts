@@ -176,7 +176,7 @@ export class TitanLoggerService {
     const orange = chalk.hex('#FFA500').bold; // Bright orange
     const inputInfo = `shouldLog called with level=${LogLevel[level]} (${level}), source=${source}, logLevel=${LogLevel[this.logLevel]} (${this.logLevel}), enableVerbose=${this.enableVerbose}, enabledClasses=[${[...this.enabledClasses].join(', ')}]`;
     if (this.enableVerbose) {
-      console.log(orange(`[shouldLog] ${inputInfo} => true (enableVerbose)`));
+      console.log(chalk.greenBright(`[shouldLog] ${inputInfo} => true (enableVerbose)`));
       return true;
     }
     const classEnabled = this.enabledClasses.has(source) || source === this.alwaysEnabledClass;

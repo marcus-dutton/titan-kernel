@@ -1,3 +1,9 @@
+  /**
+   * Log a verbose message (LogLevel.VERBOSE, source 'Verbose')
+   */
+  verbose(message: string, data?: any): void {
+    this.log(LogLevel.VERBOSE, message, 'Verbose', data);
+  }
 import { Injectable } from '../decorators/injectable';
 import chalk from 'chalk';
 import { Server as SocketIOServer } from 'socket.io';
@@ -12,11 +18,6 @@ export interface LoggerConfig {
   databaseAccess?: boolean;
   enableConsole?: boolean;
   enableSocket?: boolean;
-  /**
-   * The log level to use if the database is not available. Accepts a LogLevel enum value or string (e.g. 'DEBUG', 4).
-   * Config key: "logLevel"
-   */
-  logLevel?: LogLevel | keyof typeof LogLevel | string | number;
 }
 
 // Event emitter for log updates
@@ -177,18 +178,9 @@ export class TitanLoggerService {
   // Check if a log should be output based on class and level
   // Verbose-aware shouldLog logic
   public shouldLog(level: LogLevel, source: string): boolean {
-    // Diagnostic output for log filtering
-    // const orange = chalk.hex('#FFA500').bold; // Bright orange
-    const inputInfo = `shouldLog called with level=${LogLevel[level]} (${level}), source=${source}, logLevel=${LogLevel[this.logLevel]} (${this.logLevel}), enableVerbose=${this.enableVerbose}, enabledClasses=[${[...this.enabledClasses].join(', ')}]`;
-    if (this.enableVerbose) {
-      // console.log(chalk.greenBright(`[shouldLog] ${inputInfo} => true (enableVerbose)`));
-      return true;
-    }
+    if (this.enableVerbose) return true;
     const classEnabled = this.enabledClasses.has(source) || source === this.alwaysEnabledClass;
-    // Only log if logLevel is not NONE (0), and the log's level is less than or equal to the current logLevel
-    const result = classEnabled && this.logLevel !== LogLevel.NONE && level <= this.logLevel;
-    // console.log(orange(`[shouldLog] ${inputInfo} => ${result}`));
-    return result;
+    return classEnabled && this.logLevel !== LogLevel.NONE && level >= this.logLevel;
   }
 
   setSocketServer(server: SocketIOServer): void {
@@ -289,12 +281,12 @@ export class TitanLoggerService {
   }
 
   public transferBuffer(earlyBuffer: string[]): void {
-    // console.log(`Transferring ${earlyBuffer.length} early console messages`);
+    console.log(`Transferring ${earlyBuffer.length} early console messages`);
     
     // Add early messages to the beginning - NO SIZE LIMIT!
     this.consoleBuffer = [...earlyBuffer, ...this.consoleBuffer];
     
-    // console.log(`Buffer now contains ${this.consoleBuffer.length} total messages`);
+    console.log(`Buffer now contains ${this.consoleBuffer.length} total messages`);
     
     // Broadcast transferred logs if socket ready
     if (this.socketServer) {
@@ -312,35 +304,33 @@ export class TitanLoggerService {
     }
   }
 
-  private async consoleOutput(entry: LogEntry): Promise<void> {
-    setImmediate(() => {
-      // Format timestamp as mm/dd/yyyy: HH:MM:ss
-      const dateObj = new Date(entry.timestamp);
-      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const dd = String(dateObj.getDate()).padStart(2, '0');
-      const yyyy = dateObj.getFullYear();
-      const HH = String(dateObj.getHours()).padStart(2, '0');
-      const MM = String(dateObj.getMinutes()).padStart(2, '0');
-      const ss = String(dateObj.getSeconds()).padStart(2, '0');
-      const timestamp = chalk.gray(`${mm}/${dd}/${yyyy}: ${HH}:${MM}:${ss}`);
-      const source = entry.source ? chalk.cyan(`[${entry.source}]`) : '';
-      const levelColor = this.getLevelColor(entry.level);
-      const levelText = LogLevel[entry.level].padEnd(5);
-      
-      let output = `${timestamp} ${levelColor(levelText)} ${source} ${entry.message}`;
-      // Only print data if it is not null or undefined
-      if (entry.data !== undefined && entry.data !== null) {
-        output += '\n' + chalk.greenBright(JSON.stringify(entry.data, null, 2));
-      }
+  private consoleOutput(entry: LogEntry): void {
+    // Format timestamp as mm/dd/yyyy: HH:MM:ss
+    const dateObj = new Date(entry.timestamp);
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const yyyy = dateObj.getFullYear();
+    const HH = String(dateObj.getHours()).padStart(2, '0');
+    const MM = String(dateObj.getMinutes()).padStart(2, '0');
+    const ss = String(dateObj.getSeconds()).padStart(2, '0');
+    const timestamp = chalk.gray(`${mm}/${dd}/${yyyy}: ${HH}:${MM}:${ss}`);
+    const source = entry.source ? chalk.cyan(`[${entry.source}]`) : '';
+    const levelColor = this.getLevelColor(entry.level);
+    const levelText = LogLevel[entry.level].padEnd(5);
+    
+    let output = `${timestamp} ${levelColor(levelText)} ${source} ${entry.message}`;
+    
+    if (entry.data !== undefined) {
+      output += '\n' + chalk.gray(JSON.stringify(entry.data, null, 2));
+    }
 
-      // Use original console to prevent infinite recursion
-      if (this.originalConsole.log) {
-        this.originalConsole.log(output);
-      } else {
-        // Fallback if original console is not available
-        process.stdout.write(output + '\n');
-      }
-    });
+    // Use original console to prevent infinite recursion
+    if (this.originalConsole.log) {
+      this.originalConsole.log(output);
+    } else {
+      // Fallback if original console is not available
+      process.stdout.write(output + '\n');
+    }
   }
 
   private socketOutput(entry: LogEntry): void {
@@ -350,33 +340,21 @@ export class TitanLoggerService {
   }
 
   private async databaseOutput(entry: LogEntry): Promise<void> {
-    const maxAttempts = 3;
-    let attempt = 0;
-    let lastError = null;
-    while (attempt < maxAttempts) {
-      try {
-        // Dynamic import to avoid dependency issues if mongoose not installed
-        const { LogEntry } = await import('../models/log.model');
-        await LogEntry.create({
-          timestamp: new Date(entry.timestamp),
-          level: entry.level,
-          message: entry.message,
-          data: entry.data,
-          source: entry.source
-        });
-        return; // Success
-      } catch (error) {
-        lastError = error;
-        attempt++;
-        if (attempt < maxAttempts) {
-          // Wait 1 second before retrying
-          await new Promise(res => setTimeout(res, 1000));
-        }
-      }
+    try {
+      // Dynamic import to avoid dependency issues if mongoose not installed
+      const { LogEntry } = await import('../models/log.model');
+      
+      await LogEntry.create({
+        timestamp: new Date(entry.timestamp),
+        level: entry.level,
+        message: entry.message,
+        data: entry.data,
+        source: entry.source
+      });
+    } catch (error) {
+      // Silently fail database logging to prevent logging loops
+      console.warn('Failed to save log to database:', error);
     }
-    // After retries, log warning and queue for offline processing
-    console.warn('Failed to save log to database after retries:', lastError);
-    this.offlineQueue.push(entry);
   }
 
   private flushBuffer(): void {

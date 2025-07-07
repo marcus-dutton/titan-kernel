@@ -15,9 +15,22 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 - ✅ **Mongoose Utilities** - TransformMongoose for consistent JSON transformations
 - ✅ **Configuration Management** - Flexible config loading from multiple sources
 - ✅ **TypeScript Native** - Full type safety and decorator support
+- ✅ **Enhanced Module System** - Hierarchical module organization with dependency management
+- ✅ **Performance Optimized** - Improved service resolution and memory efficiency
+- ✅ **Developer Experience** - Enhanced debugging and error handling capabilities
 
-## What's New in v1.2.0 🎉
+## What's New in v1.5.0 🎉
 
+- **🔄 Enhanced Dependency Injection** - Improved circular dependency resolution and lazy loading
+- **🏗️ Advanced Module System** - Better module organization with hierarchical dependency management
+- **⚡ Performance Optimizations** - Faster service resolution and reduced memory footprint
+- **🛡️ Enhanced Error Handling** - Better error messages and debugging capabilities
+- **📦 Improved Configuration** - More flexible configuration options and environment variable support
+- **🔧 Developer Experience** - Enhanced TypeScript support and better IDE integration
+
+## Previous Releases
+
+### v1.2.0 Features
 - **🚀 Enterprise Logging System** - Complete rewrite with class-based controls, offline queuing, and real-time broadcasting
 - **🛠️ TransformMongoose Utility** - Consistent JSON transformations for Mongoose schemas with `_id` → `id` conversion
 - **📊 Advanced Logger Features** - Database operation queuing, container integration, and persistent configuration
@@ -74,20 +87,16 @@ export class UserGateway {
 async function bootstrap() {
   const context = await TitanKernel.create({
     autoScan: true,
-    database: {
-      url: 'mongodb+srv://username:password@cluster.mongodb.net/myapp?retryWrites=true&w=majority'
-    },
     logging: {
       databaseAccess: true  // Enable database persistence
     }
   });
 
-  // All log output now goes through the logger and respects logLevel and class-based filtering
-  context.logger.info('Example', `Services: ${context.services.size}`);
-  context.logger.info('Example', `Controllers: ${context.controllers.length}`);
-  context.logger.info('Example', `Gateways: ${context.gateways.length}`);
-  context.logger.info('Example', `Database Connected: ${context.database?.isReady()}`);
-  context.logger.info('Example', `Socket Service Available: ${context.socket?.isReady()}`);
+  console.log('Services:', context.services.size);
+  console.log('Controllers:', context.controllers.length);
+  console.log('Gateways:', context.gateways.length);
+  console.log('Database Connected:', context.database?.isReady());
+  console.log('Socket Service Available:', context.socket?.isReady());
 }
 
 bootstrap();
@@ -152,6 +161,41 @@ Defines a module with providers, controllers, and gateways.
 export class UserModule {}
 ```
 
+### Advanced Module System (v1.5.0+)
+
+TitanKernel v1.5.0 introduces enhanced module capabilities with hierarchical organization:
+
+```typescript
+@Module({
+  imports: [DatabaseModule, LoggingModule],  // Import other modules
+  providers: [UserService, AuthService],
+  controllers: [UserController],
+  gateways: [UserGateway],
+  exports: [UserService]  // Export services for other modules
+})
+export class UserModule {}
+
+@Module({
+  imports: [UserModule],  // Import UserModule and its exported services
+  providers: [AdminService],
+  controllers: [AdminController]
+})
+export class AdminModule {}
+
+// Bootstrap with modules
+const context = await TitanKernel.create({
+  modules: [UserModule, AdminModule],
+  autoScan: false  // Disable auto-scan when using explicit modules
+});
+```
+
+**Module Features:**
+- **Hierarchical Dependencies** - Modules can import other modules
+- **Selective Exports** - Control which services are available to other modules
+- **Lazy Loading** - Modules are loaded only when needed
+- **Dependency Validation** - Circular module dependencies are detected and prevented
+- **Scope Isolation** - Services can be scoped to specific modules
+
 ### Circular Dependencies
 
 TitanKernel automatically handles circular dependencies using lazy proxies:
@@ -186,49 +230,62 @@ Create `titan.config.json` in **your project's root directory** (not in the npm 
   "environment": {
     "isProduction": false
   },
-  "port": 3000,
-  "logging": {
-    "databaseAccess": false,
-    "logLevel": "DEBUG" // or use a number, e.g. 4
+  "server": {
+    "httpPort": 8000,
+    "httpsPort": 8443
   },
   "database": {
-    "url": "mongodb+srv://username:password@cluster.mongodb.net/myapp?retryWrites=true&w=majority",
-    "name": "myapp",
-    "options": {
-      "maxPoolSize": 10,
-      "serverSelectionTimeoutMS": 5000,
-      "socketTimeoutMS": 45000
-    }
+    "urlProd": "mongodb+srv://username:password@cluster.mongodb.net/myapp_prod?retryWrites=true&w=majority",
+    "prodName": "MyApp Production",
+    "urlDev": "mongodb+srv://username:password@cluster.mongodb.net/myapp_dev?retryWrites=true&w=majority",
+    "devName": "MyApp Development",
+    "useProductionDatabase": false,
+    "type": "mongo"
   },
-  "api": {
-    "version": "v1",
-    "prefix": "/api"
+  "logging": {
+    "databaseAccess": true,
+    "logLevel": 4
+  },
+  "authentication": {
+    "jwtSecret": "your-secret-key",
+    "jwtExpiration": "1h"
+  },
+  "cors": {
+    "allowAnyOrigin": true,
+    "allowedOrigins": [
+      "http://localhost:4200",
+      "https://your-production-app.com"
+    ]
   }
 }
 ```
 
+**Database Configuration:**
+TitanKernel supports flexible database configuration with production/development separation:
 
-**Logging Levels and Filtering:**
+- **`urlProd`** - MongoDB connection string for production
+- **`urlDev`** - MongoDB connection string for development  
+- **`useProductionDatabase`** - Boolean flag to select which database to use
+- **`type`** - Database type (currently "mongo" is supported)
+- **`prodName`** / **`devName`** - Friendly names for database connections
 
-The `logLevel` option controls which logs are output. Accepts either a string or a number:
+**Database Selection Logic:**
+The database service will use:
+1. **Production DB** if `useProductionDatabase: true` OR `environment.isProduction: true`
+2. **Development DB** otherwise
 
-- String values: `NONE`, `INFO`, `WARN`, `ERROR`, `DEBUG`, `VERBOSE`
-- Numeric values: `0` = NONE, `1` = INFO, `2` = WARN, `3` = ERROR, `4` = DEBUG, `5` = VERBOSE
+This allows for flexible database switching based on either environment or explicit configuration.
 
-**Log filtering:** Only logs with a level less than or equal to the configured `logLevel` are shown. Setting `NONE` disables all logs. All logs (including bootstrap summaries) now respect the configured log level and enabled classes. You can also enable/disable logging for specific classes.
-
-**Override order:**
-1. Database config (if available) takes precedence
-2. Otherwise, value from `titan.config.json` is used
-
-**Retry logic:**
-If database logging is enabled and a log write fails, the logger will retry up to 3 times (with 1s delay). If all attempts fail, the log is queued for later persistence.
+**Configuration Priority:**
+TitanKernel loads configuration in the following order (later sources override earlier ones):
+1. `titan.config.json` file in project root
+2. Environment variables (automatically mapped)
 
 **Environment Variable Mapping:**
 ```bash
-NODE_ENV=production           # → config.environment.isProduction (true if NODE_ENV=production)
-PORT=4000                     # → config.port
-DATABASE_URL=mongodb://...    # → config.database.url
+NODE_ENV=production              # → config.environment.isProduction (true if NODE_ENV=production)
+PORT=4000                       # → config.port
+DATABASE_URL=mongodb://...      # → config.database.url
 ```
 
 **Project Structure:**
@@ -253,24 +310,25 @@ Access config in services:
 export class DatabaseService {
   constructor(private config: ConfigService) {
     // Get specific config values
-    const dbUrl = this.config.get('database.url');
-    const port = this.config.get('port', 3000);
+    const dbConfig = this.config.get('database');
+    const httpPort = this.config.get('server.httpPort', 8000);
     
     // Or get the entire config object
     const fullConfig = this.config.getAll();
     const isProduction = fullConfig.environment?.isProduction || false;
+    
+    // Database selection logic
+    const useProductionDB = fullConfig.database?.useProductionDatabase || isProduction;
+    const dbUrl = useProductionDB ? 
+      fullConfig.database?.urlProd : 
+      fullConfig.database?.urlDev;
   }
 }
 ```
 
-
 ### Logging
 
-TitanKernel provides a robust, configurable logger with:
-- **Log levels:** `NONE`, `INFO`, `WARN`, `ERROR`, `DEBUG`, `VERBOSE` (use as string or number)
-- **Class-based filtering:** Enable/disable logs for specific classes
-- **Retry logic:** Automatic retry and queuing for DB log persistence
-- **All logs go through the logger:** No direct `console.log` in services or kernel
+Built-in enhanced logger with **automatic console capture**, **unlimited buffer for large files**, and **optional database persistence**:
 
 ```typescript
 @Injectable()
@@ -278,43 +336,48 @@ export class MyService {
   constructor(private logger: TitanLoggerService) {}
 
   doSomething() {
-    this.logger.verbose('MyService', 'Verbose message for deep diagnostics');
     this.logger.debug('MyService', 'Debug message', { data: 'value' });
     this.logger.info('MyService', 'Info message');
     this.logger.warn('MyService', 'Warning message');
     this.logger.error('MyService', 'Error message', { error: 'details' });
-    // All logs are filtered by logLevel and class-based settings
+    
+    // Regular console calls are automatically captured for frontend
+    console.log('This will be captured and sent to frontend via Socket.IO');
   }
 }
 ```
 
-**Class-based log control:**
-```typescript
-// Enable or disable logging for a specific class
-logger.enableLoggingForClass('MyService');
-logger.disableLoggingForClass('OtherService');
-```
+**Simplified Configuration:**
+TitanKernel uses a simple configuration approach - just set `databaseAccess` and `logLevel` in your config file:
 
-**No direct console.log:**
-All logging in services and kernel must use the logger. Console output is reserved for logger internals and example/demo code only.
-
-
-**Configuration Example:**
 ```json
 {
   "logging": {
     "databaseAccess": true,
-    "logLevel": "VERBOSE"
+    "logLevel": 4
   }
 }
 ```
 
-
 **Runtime Behavior:**
-- **Log Level**: Defaults to `DEBUG` (4) unless overridden; DB config takes precedence
-- **Class-based filtering**: Only enabled classes output logs
-- **Retry logic**: DB log writes are retried up to 3 times, then queued
-- **No direct console.log**: All logs go through the logger
+- **Log Level**: Defaults to `NONE` (silent)
+- **Console Capture**: Always enabled (can be toggled at runtime)
+- **Socket.IO**: Always enabled for real-time frontend updates
+- **Database Access**: Controlled by config file
+- **Auto-Upgrade**: When `databaseAccess: true` and database is ready, log level automatically upgrades to `INFO`
+
+**Console Capture & Large File Support:**
+- All `console.log()`, `console.warn()`, `console.error()`, `console.info()` calls are automatically captured
+- **Unlimited buffer size** - handles large data streams (10MB+ files, Puppeteer blobs, etc.)
+- Captured console output is sent to frontend via Socket.IO for real-time debugging
+- TitanKernel's own logging still appears in console while user console calls are captured
+- No infinite recursion - smart filtering prevents logging loops
+
+**Database Persistence:**
+- **Off by default** - set `"databaseAccess": true` to persist logs to MongoDB
+- Logs are stored in `titan_logs` collection with timestamps, levels, and metadata
+- Graceful fallback - if database is unavailable, logging continues without persistence
+- Automatic reconnection handling and offline queue for when database is not ready
 
 ### Socket Service
 
@@ -375,9 +438,14 @@ const context = await TitanKernel.create({
     exclude: ['**/*.test.ts'],
     baseDir: process.cwd()
   },
+  modules: [UserModule, AdminModule],  // v1.5.0+ Module system
   database: {
-    url: 'mongodb+srv://username:password@cluster.mongodb.net/myapp?retryWrites=true&w=majority',
-    name: 'myapp',
+    type: 'mongo',
+    urlProd: 'mongodb+srv://username:password@cluster.mongodb.net/myapp_prod?retryWrites=true&w=majority',
+    prodName: 'MyApp Production',
+    urlDev: 'mongodb+srv://username:password@cluster.mongodb.net/myapp_dev?retryWrites=true&w=majority',
+    devName: 'MyApp Development',
+    useProductionDatabase: false,
     options: {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
@@ -399,7 +467,6 @@ const socket = context.socket;
 // Initialize Socket.IO server (if you have one)
 // const io = new Server(httpServer);
 // context.socket.setServer(io);
-const socket = context.socket;
 ```
 
 ### Manual Service Resolution
@@ -472,17 +539,17 @@ Ensure your `tsconfig.json` includes:
 
 ## Enhanced Logging Features
 
-TitanKernel v1.2.0 includes a completely enhanced logging system with enterprise-grade features:
-
+TitanKernel v1.5.0 includes a completely enhanced logging system with enterprise-grade features:
 
 ### Advanced Logger Capabilities
 
-- **LogLevel.VERBOSE**: Deep diagnostics, only shown if logLevel is set to VERBOSE (5)
-- **Class-based Log Controls**: Enable/disable logging per service class
-- **Database Operation Queuing**: Offline-capable with automatic queue processing and retry
-- **Real-time Event Broadcasting**: Live log streaming via Socket.IO
-- **Persistent Configuration**: Database-stored logging preferences
-- **No direct console.log**: All logs go through the logger
+- **Class-based Log Controls** - Enable/disable logging per service class
+- **Database Operation Queuing** - Offline-capable with automatic queue processing
+- **Real-time Event Broadcasting** - Live log streaming via Socket.IO
+- **Container Integration** - Automatic discovery of injectable classes
+- **Persistent Configuration** - Database-stored logging preferences
+- **Console Capture** - Unlimited buffering for large file processing
+- **Auto-configuration** - Intelligent log level adjustment based on environment
 
 ```typescript
 import { TitanLoggerService, LogLevel } from '@titan/kernel';
@@ -494,10 +561,9 @@ export class MyService {
   initializeService() {
     // Configure logging for specific classes
     this.logger.enableLoggingForClass('MyService');
-    this.logger.setGlobalLogLevel(LogLevel.VERBOSE);
+    this.logger.setGlobalLogLevel(LogLevel.INFO);
     
     // Use structured logging
-    this.logger.verbose('MyService', 'Verbose diagnostics');
     this.logger.info('MyService', 'Service initialized', { 
       timestamp: new Date(),
       environment: process.env.NODE_ENV 
@@ -506,21 +572,9 @@ export class MyService {
 }
 ```
 
-### Logger Configuration
-
-```json
-{
-  "logging": {
-    "databaseAccess": true,
-    "enableConsole": true,
-    "enableSocket": true
-  }
-}
-```
-
 ## TransformMongoose Utility
 
-New in v1.2.0! Consistent JSON transformation for Mongoose schemas:
+Enhanced in v1.5.0! Consistent JSON transformation for Mongoose schemas:
 
 ```typescript
 import { TransformMongoose, ToJSONOptions } from '@titan/kernel';

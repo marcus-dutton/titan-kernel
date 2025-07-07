@@ -1,7 +1,6 @@
 import { Injectable } from '../decorators/injectable';
 
 import * as mongoose from 'mongoose';
-import { TitanLoggerService } from './titan-logger.service';
 
 export interface DatabaseConfig {
   type: 'mongo' | 'sql' | (string & {});
@@ -24,8 +23,8 @@ export class DatabaseService {
   private isConnected: boolean = false;
   private connection?: typeof mongoose;
   private registeredModels: Map<string, mongoose.Model<any>> = new Map();
-  private source: string = 'TitanKernel';
-  constructor(private logger: TitanLoggerService) {}
+
+  constructor() {}
 
   async connect(config: DatabaseConfig): Promise<void> {
     if (this.isConnected) {
@@ -38,17 +37,15 @@ export class DatabaseService {
       };
       const url = config.useProductionDatabase ? config.urlProd : config.urlDev;
       // Log the config and url being used for connection
-      this.logger.verbose('[DatabaseService] Attempting to connect to database with config:', {
+      console.info('[DatabaseService] Attempting to connect to database with config:', {
         url,
         options,
         type: config.type
       });
       this.connection = await mongoose.connect(url, options);
       this.isConnected = true;
-      const dbName = config.useProductionDatabase ? config.prodName : config.devName;
-      this.logger.info(this.source, `[DatabaseService] Database connected successfully to ${dbName}`);
     } catch (error: any) {
-      this.logger.error(this.source,'[DatabaseService] Database connection failed:', {
+      console.error('[DatabaseService] Database connection failed:', {
         error,
         config
       });
@@ -104,11 +101,11 @@ export class DatabaseService {
         try {
           await model.findOne().limit(1).exec();
         } catch (error: any) {
-          this.logger.warn(this.source, `[DatabaseService] Warning: Could not access collection for model ${modelName}:`, error.message);
+          console.warn(`Warning: Could not access collection for model ${modelName}:`, error.message);
         }
       }
-      this.logger.info(this.source, `[DatabaseService] Successfully validated ${existingModels.length} models.`);
-      this.logger.verbose(`✅ Validated ${existingModels.length} models:`, existingModels);
+      
+      console.log(`✅ Validated ${existingModels.length} models:`, existingModels);
       
     } catch (error: any) {
       throw new Error(`Model validation failed: ${error.message}`);

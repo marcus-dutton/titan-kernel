@@ -1,4 +1,4 @@
-  import { Injectable } from '../decorators/injectable';
+import { Injectable } from '../decorators/injectable';
 import chalk from 'chalk';
 import { Server as SocketIOServer } from 'socket.io';
 import { LogLevel } from '../interfaces/logging.interface';
@@ -314,8 +314,10 @@ export class TitanLoggerService {
     
     let output = `${timestamp} ${levelColor(levelText)} ${source} ${entry.message}`;
     
-    if (entry.data !== undefined) {
-      output += '\n' + chalk.gray(JSON.stringify(entry.data, null, 2));
+    // Only show data if it has meaningful content
+    const normalizedData = this.normalizeData(entry.data);
+    if (normalizedData !== undefined) {
+      output += '\n' + chalk.gray(JSON.stringify(normalizedData, null, 2));
     }
 
     // Use original console to prevent infinite recursion
@@ -329,7 +331,12 @@ export class TitanLoggerService {
 
   private socketOutput(entry: LogEntry): void {
     if (this.socketServer) {
-      this.socketServer.emit('log', entry);
+      // Create a clean entry with normalized data for socket output
+      const cleanEntry = {
+        ...entry,
+        data: this.normalizeData(entry.data)
+      };
+      this.socketServer.emit('log', cleanEntry);
     }
   }
 
@@ -338,11 +345,14 @@ export class TitanLoggerService {
       // Dynamic import to avoid dependency issues if mongoose not installed
       const { LogEntry } = await import('../models/log.model');
       
+      // Normalize data before storing to database
+      const normalizedData = this.normalizeData(entry.data);
+      
       await LogEntry.create({
         timestamp: new Date(entry.timestamp),
         level: entry.level,
         message: entry.message,
-        data: entry.data,
+        data: normalizedData,
         source: entry.source
       });
     } catch (error) {
@@ -762,5 +772,20 @@ export class TitanLoggerService {
     } catch (err) {
       console.error('Failed to broadcast logs:', err);
     }
+  }
+
+  // Helper method to normalize data for consistent handling across outputs
+  private normalizeData(data: any): any | undefined {
+    // Return undefined for null, undefined, or empty objects
+    if (data === undefined || data === null) {
+      return undefined;
+    }
+    
+    // Check for empty objects
+    if (typeof data === 'object' && Object.keys(data).length === 0) {
+      return undefined;
+    }
+    
+    return data;
   }
 }

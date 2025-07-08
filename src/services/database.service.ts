@@ -27,6 +27,7 @@ export class DatabaseService {
   private currentConfig?: DatabaseConfig;
   private reconnectionTimeout?: NodeJS.Timeout;
   private isReconnecting: boolean = false;
+  private listenersSetup: boolean = false;
   
   constructor(private logger: TitanLoggerService) {}
 
@@ -66,8 +67,8 @@ export class DatabaseService {
         this.connection = await mongoose.connect(url, options);
         this.isConnected = true;
         
-        // Set up connection event listeners (only on first successful connection)
-        if (currentAttempt === 0 || !mongoose.connection.listenerCount('disconnected')) {
+        // Set up connection event listeners (only once)
+        if (!this.listenersSetup) {
           mongoose.connection.on('disconnected', () => {
             this.logger.warn(this.source, 'Database disconnected - initiating automatic reconnection');
             this.isConnected = false;
@@ -89,6 +90,8 @@ export class DatabaseService {
               this.reconnectionTimeout = undefined;
             }
           });
+          
+          this.listenersSetup = true;
         }
         
         const dbName = config.useProductionDatabase ? config.prodName : config.devName;

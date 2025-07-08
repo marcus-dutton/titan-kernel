@@ -355,9 +355,22 @@ export class TitanLoggerService {
         data: normalizedData,
         source: entry.source
       });
-    } catch (error) {
+    } catch (error: any) {
+      // Check for network timeout or connection errors
+      if (error.name === 'MongoNetworkTimeoutError' || 
+          error.name === 'MongooseServerSelectionError' ||
+          error.message?.includes('timeout') ||
+          error.message?.includes('connection')) {
+        // Update database ready state to false
+        this.dbReady.next(false);
+        
+        // Move this entry to offline queue for retry later
+        this.offlineQueue.push(entry);
+      }
+      
       // Silently fail database logging to prevent logging loops
-      console.warn('Failed to save log to database:', error);
+      // Only log the error type to avoid verbose stack traces in console
+      console.warn(`Failed to save log to database: ${error.name || 'Unknown error'}`);
     }
   }
 

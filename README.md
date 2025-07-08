@@ -10,8 +10,9 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 - ✅ **Circular Dependency Support** - Lazy proxies handle complex dependency chains  
 - ✅ **Automatic Class Scanning** - Zero-config service discovery
 - ✅ **Multiple Decorator Types** - @Injectable, @Controller, @Gateway, @Module, @Component
-- ✅ **Enterprise Logging** - Advanced logger with class-based controls, offline queuing, and real-time broadcasting
-- ✅ **Database Integration** - Optional MongoDB logging with configurable persistence flag
+- ✅ **Enterprise Logging** - Advanced logger with class-based controls, data normalization, and real-time broadcasting
+- ✅ **Robust Database Integration** - MongoDB with automatic reconnection, retry logic, and connection state monitoring
+- ✅ **Smart Event Handling** - Connection-specific database event listeners with automatic recovery
 - ✅ **Mongoose Utilities** - TransformMongoose for consistent JSON transformations
 - ✅ **Configuration Management** - Flexible config loading from multiple sources
 - ✅ **TypeScript Native** - Full type safety and decorator support
@@ -19,8 +20,18 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 - ✅ **Performance Optimized** - Improved service resolution and memory efficiency
 - ✅ **Developer Experience** - Enhanced debugging and error handling capabilities
 
-## What's New in v1.5.0 🎉
+## What's New in v1.8.5 🎉
 
+- **🔗 Robust Database Connectivity** - Enhanced connection retry logic with exponential backoff and automatic reconnection
+- **🔄 Smart Event Listeners** - Improved database event handling with connection-specific monitoring
+- **⚡ Connection State Management** - Better database state tracking and graceful fallback handling
+- **🛡️ Enhanced Error Recovery** - Automatic reconnection on network drops with intelligent retry strategies
+- **📊 Improved Logging** - Better log level filtering and consistent data output handling
+- **🔧 Developer Experience** - Enhanced debugging capabilities and more reliable database operations
+
+## Previous Major Updates
+
+### v1.5.0 Features
 - **🔄 Enhanced Dependency Injection** - Improved circular dependency resolution and lazy loading
 - **🏗️ Advanced Module System** - Better module organization with hierarchical dependency management
 - **⚡ Performance Optimizations** - Faster service resolution and reduced memory footprint
@@ -328,7 +339,7 @@ export class DatabaseService {
 
 ### Logging
 
-Built-in enhanced logger with **automatic console capture**, **unlimited buffer for large files**, and **optional database persistence**:
+Built-in enhanced logger with **automatic console capture**, **consistent data output**, and **optional database persistence**:
 
 ```typescript
 @Injectable()
@@ -340,6 +351,10 @@ export class MyService {
     this.logger.info('MyService', 'Info message');
     this.logger.warn('MyService', 'Warning message');
     this.logger.error('MyService', 'Error message', { error: 'details' });
+    
+    // Enhanced data handling (v1.8.4+) - empty/null data is automatically filtered
+    this.logger.info('MyService', 'Clean message', null);     // Shows: "Clean message" (no data)
+    this.logger.info('MyService', 'With data', { key: 'value' }); // Shows: "With data { key: 'value' }"
     
     // Regular console calls are automatically captured for frontend
     console.log('This will be captured and sent to frontend via Socket.IO');
@@ -395,8 +410,10 @@ this.logger.debug('MyService', 'This will show');    // 4 <= 4 ✅
 this.logger.verbose('MyService', 'This will NOT show'); // 5 <= 4 ❌
 ```
 
-**Console Capture & Large File Support:**
+**Console Capture & Data Handling (v1.8.4+):**
 - All `console.log()`, `console.warn()`, `console.error()`, `console.info()` calls are automatically captured
+- **Consistent Data Output** - Empty, null, or undefined data objects are automatically filtered out
+- **Smart Data Normalization** - Ensures clean console, socket, and database outputs
 - **Unlimited buffer size** - handles large data streams (10MB+ files, Puppeteer blobs, etc.)
 - Captured console output is sent to frontend via Socket.IO for real-time debugging
 - TitanKernel's own logging still appears in console while user console calls are captured
@@ -476,10 +493,11 @@ const context = await TitanKernel.create({
     devName: 'MyApp Development',
     useProductionDatabase: false,
     options: {
-      // Standard mongoose connection options
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000
+      // Enhanced connection options (v1.8.4+)
+      serverSelectionTimeoutMS: 5000,  // Quick timeout for faster feedback
+      socketTimeoutMS: 45000,          // Socket timeout
+      maxPoolSize: 10,                 // Connection pooling
+      // Add any other mongoose connection options
     }
   },
   logging: {
@@ -494,6 +512,16 @@ const gateways = context.gateways;
 const database = context.database;
 const socket = context.socket;
 
+// Database connection with retry logic (v1.8.4+)
+if (database && !database.isReady()) {
+  try {
+    await database.connect(databaseConfig, 5); // Retry up to 5 times
+    console.log('Database connected with retry logic');
+  } catch (error) {
+    console.log('Database connection failed after retries:', error.message);
+  }
+}
+
 // Initialize Socket.IO server (if you have one)
 // const io = new Server(httpServer);
 // context.socket.setServer(io);
@@ -501,7 +529,7 @@ const socket = context.socket;
 
 ### Database Service API
 
-The DatabaseService provides comprehensive model management capabilities:
+The DatabaseService provides comprehensive model management capabilities with robust connection handling:
 
 ```typescript
 import { DatabaseService, ModelInfo } from '@titan/kernel';
@@ -523,17 +551,30 @@ const modelNames = database.getModelNames();
 const isReady = database.isReady();
 const connection = database.getConnection();
 
-// Model Validation
-await database.checkModels();
+// Model Validation with Retry Logic
+await database.checkModels(3); // Retry up to 3 times
+
+// Robust Connection with Auto-Retry
+await database.connect(databaseConfig, 5); // Retry up to 5 times
 ```
 
+**Enhanced Connection Features (v1.8.4+):**
+- **Automatic Retry Logic**: Connection attempts with exponential backoff (2s, 4s, 8s...)
+- **Smart Event Listeners**: Connection-specific monitoring using `this.connection.connection.on()`
+- **Auto-Reconnection**: Automatic reconnection on network drops with configurable delays
+- **Connection State Validation**: Real-time monitoring of connection readiness
+- **Model Validation Retry**: Automatic retry for model validation with timeout protection
+- **Graceful Error Handling**: Comprehensive error logging and recovery strategies
+
 **Available Methods:**
+- `connect(config, retryAttempts?)` - Connect with automatic retry logic
+- `disconnect()` - Clean disconnect with reconnection cleanup
 - `registerModel(modelInfo: ModelInfo)` - Register a new mongoose model
 - `getModel<T>(name: string)` - Get a registered model by name
 - `getAllModels()` - Get all registered models as a Map
 - `getModelNames()` - Get array of all registered model names
-- `checkModels()` - Validate all registered models and schemas
-- `isReady()` - Check if database connection is ready
+- `checkModels(retryAttempts?)` - Validate all registered models with retry logic
+- `isReady()` - Check if database connection is ready with state validation
 - `getConnection()` - Get the mongoose connection instance
 
 ### Manual Service Resolution
@@ -606,13 +647,16 @@ interface ModelInfo {
 **Database Features:**
 - MongoDB integration with mongoose (supports both local and Atlas)
 - Atlas-ready with connection pooling and timeout configurations
+- **Robust Connection Management**: Automatic retry logic with exponential backoff
+- **Smart Reconnection**: Automatic reconnection on network drops with event listeners
+- **Connection State Monitoring**: Real-time connection state tracking and validation
 - **Model Management**: Register, retrieve, and manage custom models
 - **Model Registry**: Track all registered models with `getModel()`, `getAllModels()`, `getModelNames()`
-- **Model Validation**: Automatic schema and collection validation via `checkModels()`
+- **Model Validation**: Automatic schema and collection validation via `checkModels()` with retry logic
+- **Event-Driven Architecture**: Connection-specific event listeners for disconnect/error/reconnect events
 - Automatic log model registration
-- Connection state management
 - Graceful fallback when database is unavailable
-- Configurable connection options
+- Configurable connection options with smart defaults
 
 ## File Scanning
 

@@ -67,31 +67,44 @@ export class DatabaseService {
         this.connection = await mongoose.connect(url, options);
         this.isConnected = true;
         
-        // Set up connection event listeners (only once)
+        // Set up connection event listeners (only once and after connection is established)
         if (!this.listenersSetup) {
-          mongoose.connection.on('disconnected', () => {
-            this.logger.warn(this.source, 'Database disconnected - initiating automatic reconnection');
-            this.isConnected = false;
-            this.scheduleReconnection();
-          });
-          
-          mongoose.connection.on('error', (error) => {
-            this.logger.error(this.source, 'Database connection error:', error);
-            this.isConnected = false;
-            this.scheduleReconnection();
-          });
-          
-          mongoose.connection.on('reconnected', () => {
-            this.logger.info(this.source, 'Database reconnected successfully');
-            this.isConnected = true;
-            this.isReconnecting = false;
-            if (this.reconnectionTimeout) {
-              clearTimeout(this.reconnectionTimeout);
-              this.reconnectionTimeout = undefined;
-            }
-          });
-          
-          this.listenersSetup = true;
+          try {
+            // Use a small delay to ensure mongoose.connection is fully initialized
+            setTimeout(() => {
+              if (mongoose.connection && typeof mongoose.connection.on === 'function') {
+                mongoose.connection.on('disconnected', () => {
+                  this.logger.warn(this.source, 'Database disconnected - initiating automatic reconnection');
+                  this.isConnected = false;
+                  this.scheduleReconnection();
+                });
+                
+                mongoose.connection.on('error', (error) => {
+                  this.logger.error(this.source, 'Database connection error:', error);
+                  this.isConnected = false;
+                  this.scheduleReconnection();
+                });
+                
+                mongoose.connection.on('reconnected', () => {
+                  this.logger.info(this.source, 'Database reconnected successfully');
+                  this.isConnected = true;
+                  this.isReconnecting = false;
+                  if (this.reconnectionTimeout) {
+                    clearTimeout(this.reconnectionTimeout);
+                    this.reconnectionTimeout = undefined;
+                  }
+                });
+                
+                this.logger.verbose(this.source, 'Database event listeners set up successfully');
+              } else {
+                this.logger.warn(this.source, 'mongoose.connection not available for event listeners');
+              }
+            }, 100);
+            
+            this.listenersSetup = true;
+          } catch (error) {
+            this.logger.warn(this.source, 'Failed to set up database event listeners:', error);
+          }
         }
         
         const dbName = config.useProductionDatabase ? config.prodName : config.devName;

@@ -24,7 +24,9 @@ export class DatabaseService {
   private connection?: typeof mongoose;
   private registeredModels: Map<string, mongoose.Model<any>> = new Map();
   private source: string = 'DatabaseService';
-  private config?: DatabaseConfig; // Store config for reconnection attempts
+  private currentConfig?: DatabaseConfig;
+  private reconnectionTimeout?: NodeJS.Timeout;
+  private isReconnecting: boolean = false;
   
   constructor(private logger: TitanLoggerService) {}
 
@@ -33,8 +35,8 @@ export class DatabaseService {
       return;
     }
 
-    // Store config for potential reconnection attempts
-    this.config = config;
+    // Store config for automatic reconnection
+    this.currentConfig = config;
 
     const maxRetries = retryAttempts;
     let currentAttempt = 0;
@@ -67,20 +69,25 @@ export class DatabaseService {
         // Set up connection event listeners (only on first successful connection)
         if (currentAttempt === 0 || !mongoose.connection.listenerCount('disconnected')) {
           mongoose.connection.on('disconnected', () => {
-            this.logger.warn(this.source, 'Database disconnected - will attempt reconnection');
+            this.logger.warn(this.source, 'Database disconnected - initiating automatic reconnection');
             this.isConnected = false;
-            // Attempt to reconnect after a brief delay
-            setTimeout(() => this.attemptReconnection(), 5000);
+            this.scheduleReconnection();
           });
           
           mongoose.connection.on('error', (error) => {
             this.logger.error(this.source, 'Database connection error:', error);
             this.isConnected = false;
+            this.scheduleReconnection();
           });
           
           mongoose.connection.on('reconnected', () => {
             this.logger.info(this.source, 'Database reconnected successfully');
             this.isConnected = true;
+            this.isReconnecting = false;
+            if (this.reconnectionTimeout) {
+              clearTimeout(this.reconnectionTimeout);
+              this.reconnectionTimeout = undefined;
+            }
           });
         }
         
@@ -112,31 +119,19 @@ export class DatabaseService {
     }
   }
 
-  private async attemptReconnection(config?: DatabaseConfig): Promise<void> {
-    if (this.isConnected) {
-      return; // Already reconnected
-    }
-    
-    const connectionConfig = config || this.config;
-    if (!connectionConfig) {
-      this.logger.error(this.source, 'No configuration available for reconnection');
-      return;
-    }
-    
-    try {
-      this.logger.info(this.source, 'Attempting automatic database reconnection...');
-      await this.connect(connectionConfig, 2); // Try 2 attempts for reconnection
-    } catch (error) {
-      this.logger.error(this.source, 'Automatic reconnection failed:', error);
-      // Schedule another retry in 30 seconds
-      setTimeout(() => this.attemptReconnection(), 30000);
-    }
-  }
-
   async disconnect(): Promise<void> {
+    // Cancel any pending reconnection attempts
+    if (this.reconnectionTimeout) {
+      clearTimeout(this.reconnectionTimeout);
+      this.reconnectionTimeout = undefined;
+    }
+    
+    this.isReconnecting = false;
+    
     if (this.isConnected && this.connection) {
       await mongoose.disconnect();
       this.isConnected = false;
+      this.logger.info(this.source, 'Database disconnected manually');
     }
   }
 
@@ -260,5 +255,74 @@ export class DatabaseService {
 
   getModelNames(): string[] {
     return Array.from(this.registeredModels.keys());
+  }
+
+  private scheduleReconnection(delayMs: number = 5000): void {
+    if (this.isReconnecting || this.isConnected) {
+      return; // Already reconnecting or connected
+    }
+
+    // Clear any existing reconnection timeout
+    if (this.reconnectionTimeout) {
+      clearTimeout(this.reconnectionTimeout);
+    }
+
+    this.logger.info(this.source, `Scheduling database reconnection in ${delayMs}ms`);
+    this.reconnectionTimeout = setTimeout(() => {
+      this.attemptReconnection();
+    }, delayMs);
+  }
+
+  private async attemptReconnection(attempt: number = 1, maxAttempts: number = 5): Promise<void> {
+    if (this.isConnected || !this.currentConfig) {
+      return;
+    }
+
+    if (this.isReconnecting) {
+      return; // Already attempting reconnection
+    }
+
+    this.isReconnecting = true;
+    this.logger.info(this.source, `Attempting database reconnection (attempt ${attempt}/${maxAttempts})`);
+
+    try {
+      // Try to reconnect without triggering the full retry logic
+      const options: mongoose.ConnectOptions = {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        ...this.currentConfig.options
+      };
+      const url = this.currentConfig.useProductionDatabase ? 
+        this.currentConfig.urlProd : this.currentConfig.urlDev;
+
+      await mongoose.disconnect(); // Ensure clean disconnect first
+      this.connection = await mongoose.connect(url, options);
+      this.isConnected = true;
+      this.isReconnecting = false;
+
+      const dbName = this.currentConfig.useProductionDatabase ? 
+        this.currentConfig.prodName : this.currentConfig.devName;
+      this.logger.info(this.source, `Database reconnected successfully to ${dbName} (attempt ${attempt})`);
+
+    } catch (error: any) {
+      this.isReconnecting = false;
+      
+      if (attempt >= maxAttempts) {
+        this.logger.error(this.source, `Database reconnection failed after ${maxAttempts} attempts:`, error.message);
+        // Schedule another reconnection attempt after a longer delay
+        this.scheduleReconnection(30000); // 30 seconds
+      } else {
+        // Exponential backoff for reconnection attempts
+        const nextDelayMs = Math.pow(2, attempt) * 2000; // 4s, 8s, 16s, 32s
+        this.logger.warn(this.source, `Reconnection attempt ${attempt} failed. Next attempt in ${nextDelayMs}ms`, {
+          error: error.message
+        });
+        
+        setTimeout(() => {
+          this.attemptReconnection(attempt + 1, maxAttempts);
+        }, nextDelayMs);
+      }
+    }
   }
 }

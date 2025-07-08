@@ -37,7 +37,7 @@ export class DatabaseService {
       };
       const url = config.useProductionDatabase ? config.urlProd : config.urlDev;
       // Log the config and url being used for connection
-      this.logger.verbose(`${this} Attempting to connect to database with config:`, {
+      this.logger.verbose(this.source, `Attempting to connect to database with config:`, {
         url,
         options,
         type: config.type
@@ -107,7 +107,7 @@ export class DatabaseService {
         }
       }
       this.logger.info(this.source, `Successfully validated ${existingModels.length} models.`);
-      this.logger.verbose(`✅ Validated ${existingModels.length} models:`, existingModels);
+      this.logger.verbose(this.source,`✅ Validated ${existingModels.length} models:`, existingModels);
       
     } catch (error: any) {
       throw new Error(`Model validation failed: ${error.message}`);

@@ -196,9 +196,9 @@ export class TitanLoggerService {
     this.log(LogLevel.DEBUG, message, source, data);
   }
 
-  verbose(message: string, data?: any): void {
+  verbose(source: string, message: string, data?: any): void {
     // Always use 'Verbose' as the source for verbose logs
-    this.log(LogLevel.VERBOSE, message, 'Verbose', data);
+    this.log(LogLevel.VERBOSE, message, source, data);
   }
 
   info(source: string, message: string, data?: any): void {

@@ -366,6 +366,35 @@ TitanKernel uses a simple configuration approach - just set `databaseAccess` and
 - **Database Access**: Controlled by config file
 - **Auto-Upgrade**: When `databaseAccess: true` and database is ready, log level automatically upgrades to `INFO`
 
+**Log Level Filtering Logic:**
+
+TitanKernel uses a hierarchical log level system where higher numeric values show more messages:
+
+| Log Level | Value | Shows Messages For |
+|-----------|-------|-------------------|
+| `NONE` | 0 | No messages (silent) |
+| `INFO` | 1 | INFO only |
+| `ERROR` | 2 | INFO, ERROR |
+| `WARN` | 3 | INFO, ERROR, WARN |
+| `DEBUG` | 4 | INFO, ERROR, WARN, DEBUG |
+| `VERBOSE` | 5 | All messages (INFO, ERROR, WARN, DEBUG, VERBOSE) |
+
+**Filter Logic:** A message is shown if `messageLevel <= configuredLogLevel`. This means:
+- Setting `logLevel: 4` (DEBUG) will show INFO, ERROR, WARN, and DEBUG messages
+- Setting `logLevel: 1` (INFO) will only show INFO messages
+- Setting `logLevel: 5` (VERBOSE) will show all messages
+
+**Verbose Mode Override:** The logger also supports a `enableVerbose` flag that, when enabled, bypasses all log level filtering and shows all messages regardless of the configured log level.
+
+```typescript
+// Example: If logLevel is set to DEBUG (4)
+this.logger.info('MyService', 'This will show');     // 1 <= 4 ✅
+this.logger.error('MyService', 'This will show');    // 2 <= 4 ✅
+this.logger.warn('MyService', 'This will show');     // 3 <= 4 ✅
+this.logger.debug('MyService', 'This will show');    // 4 <= 4 ✅
+this.logger.verbose('MyService', 'This will NOT show'); // 5 <= 4 ❌
+```
+
 **Console Capture & Large File Support:**
 - All `console.log()`, `console.warn()`, `console.error()`, `console.info()` calls are automatically captured
 - **Unlimited buffer size** - handles large data streams (10MB+ files, Puppeteer blobs, etc.)
@@ -639,6 +668,23 @@ export class MyService {
       timestamp: new Date(),
       environment: process.env.NODE_ENV 
     });
+  }
+
+  demonstrateLogLevels() {
+    // Set log level to DEBUG (4) - will show INFO, ERROR, WARN, DEBUG
+    this.logger.setGlobalLogLevel(LogLevel.DEBUG);
+    
+    this.logger.info('MyService', 'Info message');       // Will show (1 <= 4)
+    this.logger.error('MyService', 'Error message');     // Will show (2 <= 4)  
+    this.logger.warn('MyService', 'Warning message');    // Will show (3 <= 4)
+    this.logger.debug('MyService', 'Debug message');     // Will show (4 <= 4)
+    this.logger.verbose('MyService', 'Verbose message'); // Will NOT show (5 <= 4)
+    
+    // Change to WARN (3) - will only show INFO, ERROR, WARN
+    this.logger.setGlobalLogLevel(LogLevel.WARN);
+    
+    this.logger.info('MyService', 'Still shows');        // Will show (1 <= 3)
+    this.logger.debug('MyService', 'Now hidden');        // Will NOT show (4 <= 3)
   }
 }
 ```

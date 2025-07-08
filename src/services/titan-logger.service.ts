@@ -174,7 +174,7 @@ export class TitanLoggerService {
   public shouldLog(level: LogLevel, source: string): boolean {
     if (this.enableVerbose) return true;
     const classEnabled = this.enabledClasses.has(source) || source === this.alwaysEnabledClass;
-    return classEnabled && this.logLevel !== LogLevel.NONE && level >= this.logLevel;
+    return classEnabled && this.logLevel !== LogLevel.NONE && level <= this.logLevel;
   }
 
   setSocketServer(server: SocketIOServer): void {

@@ -447,6 +447,7 @@ const context = await TitanKernel.create({
     devName: 'MyApp Development',
     useProductionDatabase: false,
     options: {
+      // Standard mongoose connection options
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000
@@ -469,6 +470,43 @@ const socket = context.socket;
 // context.socket.setServer(io);
 ```
 
+### Database Service API
+
+The DatabaseService provides comprehensive model management capabilities:
+
+```typescript
+import { DatabaseService, ModelInfo } from '@titan/kernel';
+
+// Model Registration
+const modelInfo: ModelInfo = {
+  name: 'Product',
+  schema: new Schema({ name: String, price: Number }),
+  collection: 'products'
+};
+const ProductModel = database.registerModel(modelInfo);
+
+// Model Retrieval
+const UserModel = database.getModel<IUser>('User');
+const allModels = database.getAllModels();
+const modelNames = database.getModelNames();
+
+// Connection Management
+const isReady = database.isReady();
+const connection = database.getConnection();
+
+// Model Validation
+await database.checkModels();
+```
+
+**Available Methods:**
+- `registerModel(modelInfo: ModelInfo)` - Register a new mongoose model
+- `getModel<T>(name: string)` - Get a registered model by name
+- `getAllModels()` - Get all registered models as a Map
+- `getModelNames()` - Get array of all registered model names
+- `checkModels()` - Validate all registered models and schemas
+- `isReady()` - Check if database connection is ready
+- `getConnection()` - Get the mongoose connection instance
+
 ### Manual Service Resolution
 
 ```typescript
@@ -482,21 +520,42 @@ const gateways = container.getGatewayClasses();
 
 ### Database Integration
 
-TitanKernel provides optional MongoDB integration for log persistence:
+TitanKernel provides optional MongoDB integration with enhanced model management:
 
 ```typescript
-import { DatabaseService, LogModel } from '@titan/kernel';
+import { DatabaseService, ModelInfo, LogModel } from '@titan/kernel';
+import { Schema } from 'mongoose';
 
 @Injectable()
 export class MyService {
   constructor(private database: DatabaseService) {}
 
-  async checkDatabase() {
+  async setupDatabase() {
     const isReady = this.database.isReady();
     console.log('Database ready:', isReady);
     
-    // Access log entries from database
     if (isReady) {
+      // Register a custom model
+      const userModelInfo: ModelInfo = {
+        name: 'User',
+        schema: new Schema({
+          name: { type: String, required: true },
+          email: { type: String, required: true },
+          createdAt: { type: Date, default: Date.now }
+        }),
+        collection: 'users'
+      };
+      
+      const UserModel = this.database.registerModel(userModelInfo);
+      
+      // Get registered models
+      const userModel = this.database.getModel('User');
+      const allModels = this.database.getAllModels();
+      const modelNames = this.database.getModelNames();
+      
+      console.log('Available models:', modelNames);
+      
+      // Access log entries from database
       const recentLogs = await LogModel.find()
         .sort({ timestamp: -1 })
         .limit(10);
@@ -506,9 +565,21 @@ export class MyService {
 }
 ```
 
+**ModelInfo Interface:**
+```typescript
+interface ModelInfo {
+  name: string;                    // Model name
+  schema: mongoose.Schema;         // Mongoose schema
+  collection?: string;             // Optional collection name
+}
+```
+
 **Database Features:**
 - MongoDB integration with mongoose (supports both local and Atlas)
 - Atlas-ready with connection pooling and timeout configurations
+- **Model Management**: Register, retrieve, and manage custom models
+- **Model Registry**: Track all registered models with `getModel()`, `getAllModels()`, `getModelNames()`
+- **Model Validation**: Automatic schema and collection validation via `checkModels()`
 - Automatic log model registration
 - Connection state management
 - Graceful fallback when database is unavailable

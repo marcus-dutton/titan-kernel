@@ -8,7 +8,8 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 
 - ✅ **Angular-style Dependency Injection** - Full constructor injection with access modifiers
 - ✅ **Circular Dependency Support** - Lazy proxies handle complex dependency chains  
-- ✅ **Automatic Class Scanning** - Zero-config service discovery
+- ✅ **Automatic Class Scanning** - Zero-config service discovery (development) with bundler support (production)
+- ✅ **Bundler-Friendly** - Full webpack, rollup, and other bundler support with automatic environment detection
 - ✅ **Multiple Decorator Types** - @Injectable, @Controller, @Gateway, @Module, @Component
 - ✅ **Enterprise Logging** - Advanced logger with class-based controls, data normalization, and real-time broadcasting
 - ✅ **Robust Database Integration** - MongoDB with automatic reconnection, retry logic, and connection state monitoring
@@ -20,7 +21,78 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 - ✅ **Performance Optimized** - Improved service resolution and memory efficiency
 - ✅ **Developer Experience** - Enhanced debugging and error handling capabilities
 
-## What's New in v1.8.5 🎉
+## Bundler Support (Webpack, Rollup, etc.) 🚨
+
+**IMPORTANT:** When using webpack or other bundlers, you **MUST** configure them to preserve class names and function names, otherwise the dependency injection decorators will fail.
+
+### Webpack Configuration
+
+For webpack, add the following to your `webpack.config.js`:
+
+```javascript
+const TerserPlugin = require('terser-webpack-plugin');
+
+module.exports = {
+  // ... your existing config
+  optimization: {
+    minimize: true,
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          mangle: {
+            keep_classnames: true,  // ✅ REQUIRED: Keep class names intact
+            keep_fnames: true       // ✅ REQUIRED: Keep function names intact
+          },
+          compress: {
+            keep_classnames: true,  // ✅ REQUIRED: Keep class names during compression
+            keep_fnames: true       // ✅ REQUIRED: Keep function names during compression
+          }
+        }
+      })
+    ]
+  }
+};
+```
+
+### Alternative: Disable Minification
+
+For Node.js backends where file size isn't critical, you can simply disable minification:
+
+```javascript
+module.exports = {
+  // ... your existing config
+  optimization: {
+    minimize: false  // Disables all minification
+  }
+};
+```
+
+### Why This Is Required
+
+TitanKernel relies on class names for dependency injection registration. When bundlers minify code, they change class names from `Application` to single letters like `m`, which breaks the decorator registration system.
+
+**Without proper configuration:**
+```javascript
+// Your code: class Application {}
+// Bundled output: class m {}  ❌ Breaks dependency injection
+```
+
+**With proper configuration:**
+```javascript
+// Your code: class Application {}
+// Bundled output: class Application {}  ✅ Works correctly
+```
+
+### Environment Detection
+
+TitanKernel automatically detects bundled vs unbundled environments:
+
+- **Development (unbundled)**: Scans TypeScript files on disk
+- **Production (bundled)**: Uses classes already loaded in memory by the bundle
+
+This allows the same codebase to work seamlessly in both development and production environments.
+
+## What's New in v1.8.7 🎉
 
 - **🔗 Robust Database Connectivity** - Enhanced connection retry logic with exponential backoff and automatic reconnection
 - **🔄 Smart Event Listeners** - Improved database event handling with connection-specific monitoring

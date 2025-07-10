@@ -62,9 +62,22 @@ export class TitanKernel {
     // Auto-scan for services if enabled
     if (autoScan) {
       this.logger.debug(this.source, 'Starting auto-scan for services...');
-      const scannedFiles = await fileScanner.scanForClasses(scanOptions);
-      this.logger.info(this.source, `Scanned ${scannedFiles.length} files`);
-      this.logger.verbose(this.source, 'Scanned files detail', { files: scannedFiles });
+
+      // Detect if we're in a bundled environment
+      const isBundled = this.detectBundledEnvironment();
+
+      if (isBundled) {
+        // In bundled mode, classes are already loaded and registered
+        // Just log that we're skipping file scanning
+        this.logger.debug(this.source, 'Bundled environment detected - classes already loaded via bundle execution');
+        this.logger.info(this.source, 'Scanned 0 files (bundled mode)');
+      } else {
+        // In development mode, scan files normally to load and register classes
+        this.logger.debug(this.source, 'File system scanning mode');
+        const scannedFiles = await fileScanner.scanForClasses(scanOptions);
+        this.logger.info(this.source, `Scanned ${scannedFiles.length} files`);
+        this.logger.verbose(this.source, 'Scanned files detail', { files: scannedFiles });
+      }
     }
 
     // Log discovered services - use verbose for detailed counts
@@ -184,5 +197,20 @@ export class TitanKernel {
   static async create(options?: BootstrapOptions): Promise<TitanKernelContext> {
     const kernel = new TitanKernel();
     return await kernel.bootstrap(options);
+  }
+
+  private detectBundledEnvironment(): boolean {
+    const mainFilename = require.main?.filename || '';
+    const isBundled = mainFilename.endsWith('.js') &&
+      !mainFilename.includes('node_modules') &&
+      !mainFilename.includes('ts-node');
+
+    this.logger.debug(this.source, 'Environment detection', {
+      mainFilename,
+      isBundled,
+      nodeEnv: process.env.NODE_ENV
+    });
+
+    return isBundled;
   }
 }

@@ -4,12 +4,22 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 
 **Repository:** [https://github.com/marcus-dutton/titan-kernel](https://github.com/marcus-dutton/titan-kernel)
 
+## ⚠️ Important: Bundling Not Supported
+
+**TitanKernel does not support bundling.** The automatic class discovery feature relies on file system scanning and will not work with bundled applications (webpack, vite, rollup, etc.).
+
+**Recommended approach:**
+- Use TitanKernel for development and production environments **without bundling**
+- Use build tools for TypeScript compilation, minification, and optimization
+- Deploy the compiled JavaScript files directly without bundling
+
+If you need bundling for your application, you'll need to manually register all your services, controllers, and gateways instead of relying on auto-discovery.
+
 ## Features
 
 - ✅ **Angular-style Dependency Injection** - Full constructor injection with access modifiers
 - ✅ **Circular Dependency Support** - Lazy proxies handle complex dependency chains  
-- ✅ **Automatic Class Scanning** - Zero-config service discovery (development) with universal bundler support (production)
-- ✅ **Universal Bundler Support** - Seamless webpack, vite, rollup, and other bundler compatibility ([Configuration Guide](./BUNDLER_SUPPORT.md))
+- ✅ **Automatic Class Scanning** - Zero-config service discovery via file system scanning
 - ✅ **Multiple Decorator Types** - @Injectable, @Controller, @Gateway, @Module, @Component
 - ✅ **Enterprise Logging** - Advanced logger with class-based controls, data normalization, and real-time broadcasting
 - ✅ **Robust Database Integration** - MongoDB with automatic reconnection, retry logic, and connection state monitoring
@@ -336,96 +346,6 @@ export class DatabaseService {
       fullConfig.database?.urlDev;
   }
 }
-```
-
-### Bundler Support & Production Builds
-
-TitanKernel provides **universal bundler support** for seamless deployment with webpack, vite, rollup, and other modern bundlers. The kernel automatically adapts its class discovery strategy based on the environment:
-
-#### Development vs Production
-- **Development**: File system scanning discovers decorated classes automatically
-- **Production**: Bundler-specific discovery ensures all classes are found in bundled environments
-
-#### Supported Bundlers
-✅ **Webpack** - Uses `require.context()` for automatic discovery  
-✅ **Vite** - Detected via environment variables and global objects  
-✅ **Rollup** - Detected via environment variables and global objects  
-✅ **Universal Fallback** - Dynamic discovery using require.cache analysis
-
-#### Automatic Discovery
-The kernel automatically detects the bundler environment and uses the appropriate discovery strategy:
-
-```typescript
-// No additional configuration needed!
-const context = await TitanKernel.create({
-  autoScan: true  // Works in both dev and production
-});
-```
-
-#### Manual Discovery (Advanced)
-For custom bundler configurations or advanced use cases, you can manually trigger discovery:
-
-```typescript
-import { BundlerDiscovery } from '@titan/kernel';
-
-// Manual discovery with custom patterns
-const discovered = BundlerDiscovery.performAutoDiscovery({
-  baseDir: './src',
-  patterns: ['**/*.service.ts', '**/*.controller.ts', '**/*.gateway.ts']
-});
-
-console.log('Discovered files:', discovered.files);
-console.log('Discovery method:', discovered.method);
-```
-
-**📖 For detailed bundler configuration examples and troubleshooting, see [BUNDLER_SUPPORT.md](./BUNDLER_SUPPORT.md)**
-
-#### Webpack Configuration
-For webpack projects, ensure your build includes all feature files:
-
-```javascript
-// webpack.config.js
-module.exports = {
-  entry: './src/application.ts',
-  // Webpack will automatically handle require.context() calls
-  resolve: {
-    extensions: ['.ts', '.js']
-  }
-};
-```
-
-#### Vite Configuration
-Vite projects work out of the box with dynamic imports:
-
-```javascript
-// vite.config.js
-export default {
-  build: {
-    rollupOptions: {
-      // Vite handles dynamic discovery automatically
-    }
-  }
-};
-```
-
-#### Troubleshooting Bundled Builds
-If services, controllers, or gateways are not discovered in production:
-
-1. **Check bundle contents**: Verify your bundler includes all feature files
-2. **Enable debug logging**: Set `TITAN_DEBUG=true` to see discovery details
-3. **Use explicit modules**: Consider using `@Module()` decorators for guaranteed discovery
-4. **Manual imports**: As a fallback, explicitly import all feature files in your main application file
-
-```typescript
-// Manual fallback approach
-import './features/auth/auth.service';
-import './features/users/user.controller';
-import './features/chat/chat.gateway';
-// ... import all your decorated classes
-
-const context = await TitanKernel.create({
-  autoScan: true  // Will discover the manually imported classes
-});
 ```
 
 ### Logging

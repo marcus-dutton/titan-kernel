@@ -35,6 +35,8 @@ export type { BootstrapOptions } from './kernel/titan-kernel';
 
 // Utils
 export { FileScanner, fileScanner } from './utils/file-scanner';
+export { BundlerDiscovery } from './utils/bundler-discovery';
+export type { BundlerDiscoveryResult } from './utils/bundler-discovery';
 export { TransformMongoose } from './utils/transform-mongoose';
 export type { ToJSONOptions } from './utils/transform-mongoose';
 

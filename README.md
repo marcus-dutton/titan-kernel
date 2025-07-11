@@ -8,8 +8,8 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 
 - ✅ **Angular-style Dependency Injection** - Full constructor injection with access modifiers
 - ✅ **Circular Dependency Support** - Lazy proxies handle complex dependency chains  
-- ✅ **Automatic Class Scanning** - Zero-config service discovery (development) with bundler support (production)
-- ✅ **Bundler-Friendly** - Full webpack, rollup, and other bundler support with automatic environment detection
+- ✅ **Automatic Class Scanning** - Zero-config service discovery (development) with universal bundler support (production)
+- ✅ **Universal Bundler Support** - Seamless webpack, vite, rollup, and other bundler compatibility ([Configuration Guide](./BUNDLER_SUPPORT.md))
 - ✅ **Multiple Decorator Types** - @Injectable, @Controller, @Gateway, @Module, @Component
 - ✅ **Enterprise Logging** - Advanced logger with class-based controls, data normalization, and real-time broadcasting
 - ✅ **Robust Database Integration** - MongoDB with automatic reconnection, retry logic, and connection state monitoring
@@ -21,78 +21,7 @@ Angular-inspired modular backend kernel for Node.js with full dependency injecti
 - ✅ **Performance Optimized** - Improved service resolution and memory efficiency
 - ✅ **Developer Experience** - Enhanced debugging and error handling capabilities
 
-## Bundler Support (Webpack, Rollup, etc.) 🚨
-
-**IMPORTANT:** When using webpack or other bundlers, you **MUST** configure them to preserve class names and function names, otherwise the dependency injection decorators will fail.
-
-### Webpack Configuration
-
-For webpack, add the following to your `webpack.config.js`:
-
-```javascript
-const TerserPlugin = require('terser-webpack-plugin');
-
-module.exports = {
-  // ... your existing config
-  optimization: {
-    minimize: true,
-    minimizer: [
-      new TerserPlugin({
-        terserOptions: {
-          mangle: {
-            keep_classnames: true,  // ✅ REQUIRED: Keep class names intact
-            keep_fnames: true       // ✅ REQUIRED: Keep function names intact
-          },
-          compress: {
-            keep_classnames: true,  // ✅ REQUIRED: Keep class names during compression
-            keep_fnames: true       // ✅ REQUIRED: Keep function names during compression
-          }
-        }
-      })
-    ]
-  }
-};
-```
-
-### Alternative: Disable Minification
-
-For Node.js backends where file size isn't critical, you can simply disable minification:
-
-```javascript
-module.exports = {
-  // ... your existing config
-  optimization: {
-    minimize: false  // Disables all minification
-  }
-};
-```
-
-### Why This Is Required
-
-TitanKernel relies on class names for dependency injection registration. When bundlers minify code, they change class names from `Application` to single letters like `m`, which breaks the decorator registration system.
-
-**Without proper configuration:**
-```javascript
-// Your code: class Application {}
-// Bundled output: class m {}  ❌ Breaks dependency injection
-```
-
-**With proper configuration:**
-```javascript
-// Your code: class Application {}
-// Bundled output: class Application {}  ✅ Works correctly
-```
-
-### Environment Detection
-
-TitanKernel automatically detects bundled vs unbundled environments:
-
-- **Development (unbundled)**: Scans TypeScript files on disk
-- **Production (bundled)**: Uses classes already loaded in memory by the bundle
-
-This allows the same codebase to work seamlessly in both development and production environments.
-
-## What's New in v1.8.7 🎉
+## What's New in v1.8.5 🎉
 
 - **🔗 Robust Database Connectivity** - Enhanced connection retry logic with exponential backoff and automatic reconnection
 - **🔄 Smart Event Listeners** - Improved database event handling with connection-specific monitoring
@@ -407,6 +336,96 @@ export class DatabaseService {
       fullConfig.database?.urlDev;
   }
 }
+```
+
+### Bundler Support & Production Builds
+
+TitanKernel provides **universal bundler support** for seamless deployment with webpack, vite, rollup, and other modern bundlers. The kernel automatically adapts its class discovery strategy based on the environment:
+
+#### Development vs Production
+- **Development**: File system scanning discovers decorated classes automatically
+- **Production**: Bundler-specific discovery ensures all classes are found in bundled environments
+
+#### Supported Bundlers
+✅ **Webpack** - Uses `require.context()` for automatic discovery  
+✅ **Vite** - Detected via environment variables and global objects  
+✅ **Rollup** - Detected via environment variables and global objects  
+✅ **Universal Fallback** - Dynamic discovery using require.cache analysis
+
+#### Automatic Discovery
+The kernel automatically detects the bundler environment and uses the appropriate discovery strategy:
+
+```typescript
+// No additional configuration needed!
+const context = await TitanKernel.create({
+  autoScan: true  // Works in both dev and production
+});
+```
+
+#### Manual Discovery (Advanced)
+For custom bundler configurations or advanced use cases, you can manually trigger discovery:
+
+```typescript
+import { BundlerDiscovery } from '@titan/kernel';
+
+// Manual discovery with custom patterns
+const discovered = BundlerDiscovery.performAutoDiscovery({
+  baseDir: './src',
+  patterns: ['**/*.service.ts', '**/*.controller.ts', '**/*.gateway.ts']
+});
+
+console.log('Discovered files:', discovered.files);
+console.log('Discovery method:', discovered.method);
+```
+
+**📖 For detailed bundler configuration examples and troubleshooting, see [BUNDLER_SUPPORT.md](./BUNDLER_SUPPORT.md)**
+
+#### Webpack Configuration
+For webpack projects, ensure your build includes all feature files:
+
+```javascript
+// webpack.config.js
+module.exports = {
+  entry: './src/application.ts',
+  // Webpack will automatically handle require.context() calls
+  resolve: {
+    extensions: ['.ts', '.js']
+  }
+};
+```
+
+#### Vite Configuration
+Vite projects work out of the box with dynamic imports:
+
+```javascript
+// vite.config.js
+export default {
+  build: {
+    rollupOptions: {
+      // Vite handles dynamic discovery automatically
+    }
+  }
+};
+```
+
+#### Troubleshooting Bundled Builds
+If services, controllers, or gateways are not discovered in production:
+
+1. **Check bundle contents**: Verify your bundler includes all feature files
+2. **Enable debug logging**: Set `TITAN_DEBUG=true` to see discovery details
+3. **Use explicit modules**: Consider using `@Module()` decorators for guaranteed discovery
+4. **Manual imports**: As a fallback, explicitly import all feature files in your main application file
+
+```typescript
+// Manual fallback approach
+import './features/auth/auth.service';
+import './features/users/user.controller';
+import './features/chat/chat.gateway';
+// ... import all your decorated classes
+
+const context = await TitanKernel.create({
+  autoScan: true  // Will discover the manually imported classes
+});
 ```
 
 ### Logging

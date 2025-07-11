@@ -6,6 +6,7 @@ import { TitanLoggerService, LogLevel, LoggerConfig } from '../services/titan-lo
 import { DatabaseService, DatabaseConfig } from '../services/database.service';
 import { SocketService } from '../services/socket.service';
 import { fileScanner } from '../utils/file-scanner';
+import { BundlerDiscovery } from '../utils/bundler-discovery';
 
 export interface BootstrapOptions {
   autoScan?: boolean;
@@ -67,10 +68,19 @@ export class TitanKernel {
       const isBundled = this.detectBundledEnvironment();
 
       if (isBundled) {
-        // In bundled mode, classes are already loaded and registered
-        // Just log that we're skipping file scanning
-        this.logger.debug(this.source, 'Bundled environment detected - classes already loaded via bundle execution');
-        this.logger.info(this.source, 'Scanned 0 files (bundled mode)');
+        // In bundled mode, attempt universal auto-discovery
+        this.logger.debug(this.source, 'Bundled environment detected - attempting auto-discovery...');
+        
+        const bundlerDiscovery = new BundlerDiscovery(this.logger);
+        const result = bundlerDiscovery.performAutoDiscovery();
+        
+        if (result.discovered > 0) {
+          this.logger.info(this.source, `Auto-discovered ${result.discovered} files (${result.bundlerType} bundler)`);
+          this.logger.verbose(this.source, 'Bundler discovery details', { result });
+        } else {
+          this.logger.debug(this.source, 'No bundler auto-discovery available - relying on pre-loaded classes');
+          this.logger.info(this.source, 'Scanned 0 files (bundled mode)');
+        }
       } else {
         // In development mode, scan files normally to load and register classes
         this.logger.debug(this.source, 'File system scanning mode');

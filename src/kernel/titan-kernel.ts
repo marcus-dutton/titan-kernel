@@ -215,7 +215,7 @@ export class TitanKernel {
       !mainFilename.includes('node_modules') &&
       !mainFilename.includes('ts-node');
 
-    this.logger.debug(this.source, 'Environment detection', {
+    this.logger.verbose(this.source, 'Environment detection', {
       mainFilename,
       isBundled,
       nodeEnv: process.env.NODE_ENV
